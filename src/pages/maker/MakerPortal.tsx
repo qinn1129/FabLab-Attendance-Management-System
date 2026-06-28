@@ -1,0 +1,72 @@
+import React, { useState } from "react";
+import { Users } from "lucide-react";
+import { Input } from "../../components/common";
+import { MakerLayout } from "../../layouts/MakerLayout";
+import { MakerDashboard } from "./Dashboard";
+import { MakerAttendance } from "./Attendance";
+import { MakerCommissions } from "./Commissions";
+import { MakerResources } from "./Resources";
+import { MakerProfile } from "./Profile";
+
+/**
+ * Root component for the Resident Maker domain. Handles authentication state and rendering the active screen.
+ * @param {Object} props
+ * @param {Function} props.onBack
+ * @returns {JSX.Element}
+ */
+export function MakerPortal({ onBack }: { onBack: () => void }) {
+  const [loggedIn, setLoggedIn] = useState(false);
+  const [screen, setScreen] = useState("dashboard");
+  const [email, setEmail] = useState("");
+  const [pass, setPass] = useState("");
+
+  // TODO
+  const handleLogin = () => {
+    setLoggedIn(true);
+  };
+
+  if (!loggedIn) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[linear-gradient(135deg,_#064e3b_0%,_#065f46_60%,_#0f172a_100%)]">
+        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-8">
+          <div className="text-center mb-7">
+            <div className="w-12 h-12 rounded-xl bg-emerald-500 flex items-center justify-center mx-auto mb-3">
+              <Users className="w-6 h-6 text-white" />
+            </div>
+            <h2 className="text-xl font-bold text-gray-900">Resident Maker Portal</h2>
+            <p className="text-gray-400 text-sm mt-1">Animo Labs FabLab — RM Dashboard</p>
+          </div>
+          <div className="space-y-3 mb-5">
+
+            {/*For logging in*/}
+            <Input label="Email Address" type="email" value={email} onChange={setEmail} placeholder="name@dlsu.edu.ph" />
+            <Input label="Password" type="password" value={pass} onChange={setPass} placeholder="••••••••" />
+          </div>
+          <button onClick={handleLogin} disabled={!email || !pass} className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white font-semibold py-2.5 rounded-xl transition">
+            Sign In
+          </button>
+          <button onClick={onBack} className="w-full mt-3 text-gray-400 hover:text-gray-600 text-sm transition text-center">
+            ← Back to Home
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const renderScreen = () => {
+    switch (screen) {
+      case "dashboard": return <MakerDashboard />;
+      case "attendance": return <MakerAttendance />;
+      case "commissions": return <MakerCommissions />;
+      case "resources": return <MakerResources />;
+      case "profile": return <MakerProfile />;
+      default: return <MakerDashboard />;
+    }
+  };
+
+  return (
+    <MakerLayout currentScreen={screen} setScreen={setScreen} onLogout={() => setLoggedIn(false)}>
+      {renderScreen()}
+    </MakerLayout>
+  );
+}
