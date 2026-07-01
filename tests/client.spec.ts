@@ -6,10 +6,19 @@ async function goToClientPortal(page: Page) {
 }
 
 async function makeCapacityAvailable(page: Page) {
-	const simulateSpace = page.getByText(/Simulate Space/i);
+	const clearDatabaseButton = page.getByRole('button', { name: /Clear Database/i });
 
-	if (await simulateSpace.isVisible().catch(() => false)) {
-		await simulateSpace.click();
+	if (await clearDatabaseButton.isVisible().catch(() => false)) {
+		await clearDatabaseButton.click();
+
+		// Clear Database reloads the page, so wait for home page to appear again
+		await expect(page.getByRole('button', { name: /Client Portal/i })).toBeVisible();
+
+		// Go back into Client Portal after reload
+		await page.getByRole('button', { name: /Client Portal/i }).click();
+
+		await expect(page.getByText(/FabLab Capacity/i)).toBeVisible();
+		await expect(page.getByText(/\(AVAILABLE\)/i)).toBeVisible();
 	}
 }
 
@@ -139,14 +148,16 @@ test.describe('Client Portal Tests', () => {
 	});
 
     //Will update this test after backend is done.
-	test('TC-003 - client can simulate available space', async ({ page }) => {
+	test('TC-003 - client can clear database to simulate available space', async ({ page }) => {
 		await goToClientPortal(page);
 
+		await expect(page.getByText(/FabLab Capacity/i)).toBeVisible();
 		await expect(page.getByText(/\(FULL\)/i)).toBeVisible();
 
 		await makeCapacityAvailable(page);
 
 		await expect(page.getByText(/FabLab Capacity/i)).toBeVisible();
+		await expect(page.getByText(/\(AVAILABLE\)/i)).toBeVisible();
 		await expect(page.getByText(/\(FULL\)/i)).toHaveCount(0);
 	});
 
