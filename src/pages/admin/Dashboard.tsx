@@ -1,25 +1,30 @@
 import React from "react";
 import { ResponsiveContainer, BarChart as ReBarChart, CartesianGrid, XAxis, YAxis, Tooltip, Bar, PieChart, Pie, Cell } from "recharts";
 import { PageHeader, StatCard, StatusBadge } from "../../components/common";
-import { COMMISSIONS, CHART_COMMISSION, CHART_STATUS } from "../../constants/mockData";
+import { CHART_COMMISSION, CHART_STATUS } from "../../constants/mockData";
+import { type Commission } from "../../services/sheetsService";
 
 /**
  * Renders the Admin Dashboard overview.
  * Domain: Admin
  * @returns {JSX.Element}
  */
-export function AdminDashboard() {
+export function AdminDashboard({ commissions }: { commissions: Commission[] }) {
+  const totalComs = commissions.length;
+  const awaitingApproval = commissions.filter(c => c.status === "Awaiting Approval").length;
+  const completedComs = commissions.filter(c => c.status === "Completed").length;
+
   return (
     <div className="p-6">
 
-      {/*Hardcoded*/}
-      <PageHeader title="Dashboard" sub="FabLab overview — Mon, June 23, 2026" />
+      {/*Dynamic Header*/}
+      <PageHeader title="Dashboard" sub={`FabLab overview · ${totalComs} Total Commissions`} />
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <StatCard label="Total Commissions" value={56} sub="+3 this week" color="text-foreground" />
-        <StatCard label="Pending Approval" value={3} sub="Requires action" color="text-orange-500" />
+        <StatCard label="Total Commissions" value={totalComs} sub="Synced from Sheets" color="text-foreground" />
+        <StatCard label="Pending Approval" value={awaitingApproval} sub="Requires action" color="text-orange-500" />
         <StatCard label="Active RMs" value={4} sub="1 on leave" color="text-emerald-600" />
-        <StatCard label="Completed Today" value={2} sub="COMs approved" color="text-blue-600" />
+        <StatCard label="Completed Jobs" value={completedComs} sub="All time" color="text-blue-600" />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 mb-5">
@@ -78,12 +83,12 @@ export function AdminDashboard() {
             </tr>
           </thead>
           <tbody>
-            {COMMISSIONS.slice(0, 5).map(c => (
+            {commissions.slice().reverse().slice(0, 5).map(c => (
               <tr key={c.id} className="border-b border-muted hover:bg-muted/50 transition">
                 <td className="py-2 pr-4 font-mono text-xs text-muted-foreground">{c.id}</td>
                 <td className="py-2 pr-4 font-medium text-foreground">{c.client}</td>
                 <td className="py-2 pr-4 text-muted-foreground">{c.service}</td>
-                <td className="py-2 pr-4 text-muted-foreground">{c.rm || <span className="text-muted-foreground">Unassigned</span>}</td>
+                <td className="py-2 pr-4 text-muted-foreground">{c.rm || <span className="text-muted-foreground italic">Unassigned</span>}</td>
                 <td className="py-2"><StatusBadge status={c.status} /></td>
               </tr>
             ))}

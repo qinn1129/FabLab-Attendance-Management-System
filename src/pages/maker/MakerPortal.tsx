@@ -7,6 +7,8 @@ import { MakerAttendance } from "./Attendance";
 import { MakerCommissions } from "./Commissions";
 import { MakerResources } from "./Resources";
 import { MakerProfile } from "./Profile";
+import { RESIDENT_MAKERS } from "../../constants/mockData";
+import { type Commission } from "../../services/sheetsService";
 
 /**
  * Root component for the Resident Maker domain. Handles authentication state and rendering the active screen.
@@ -14,14 +16,30 @@ import { MakerProfile } from "./Profile";
  * @param {Function} props.onBack
  * @returns {JSX.Element}
  */
-export function MakerPortal({ onBack }: { onBack: () => void }) {
+export function MakerPortal({ 
+  onBack, 
+  commissions, 
+  onUpdate, 
+  isLoading 
+}: { 
+  onBack: () => void; 
+  commissions: Commission[]; 
+  onUpdate: (id: string, updates: Partial<Commission>) => Promise<void>; 
+  isLoading: boolean; 
+}) {
   const [loggedIn, setLoggedIn] = useState(false);
   const [screen, setScreen] = useState("dashboard");
   const [email, setEmail] = useState("");
   const [pass, setPass] = useState("");
+  const [makerName, setMakerName] = useState("Juan dela Cruz");
 
-  // TODO
   const handleLogin = () => {
+    const matched = RESIDENT_MAKERS.find(r => r.email.toLowerCase() === email.trim().toLowerCase());
+    if (matched) {
+      setMakerName(matched.name);
+    } else {
+      setMakerName("Juan dela Cruz");
+    }
     setLoggedIn(true);
   };
 
@@ -37,8 +55,6 @@ export function MakerPortal({ onBack }: { onBack: () => void }) {
             <p className="text-gray-400 text-sm mt-1">Animo Labs FabLab — RM Dashboard</p>
           </div>
           <div className="space-y-3 mb-5">
-
-            {/*For logging in*/}
             <Input label="Email Address" type="email" value={email} onChange={setEmail} placeholder="name@dlsu.edu.ph" />
             <Input label="Password" type="password" value={pass} onChange={setPass} placeholder="••••••••" />
           </div>
@@ -55,12 +71,12 @@ export function MakerPortal({ onBack }: { onBack: () => void }) {
 
   const renderScreen = () => {
     switch (screen) {
-      case "dashboard": return <MakerDashboard />;
+      case "dashboard": return <MakerDashboard commissions={commissions} makerName={makerName} />;
       case "attendance": return <MakerAttendance />;
-      case "commissions": return <MakerCommissions />;
+      case "commissions": return <MakerCommissions commissions={commissions} onUpdate={onUpdate} makerName={makerName} />;
       case "resources": return <MakerResources />;
       case "profile": return <MakerProfile />;
-      default: return <MakerDashboard />;
+      default: return <MakerDashboard commissions={commissions} makerName={makerName} />;
     }
   };
 

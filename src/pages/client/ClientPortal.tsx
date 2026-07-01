@@ -6,7 +6,7 @@ import { WorkshopsSection } from "../../components/client/WorkshopsSection";
 import { TestimonialsSection } from "../../components/client/TestimonialsSection";
 import { ProgressBar } from "../../components/client/ProgressBar";
 import { Input, Select } from "../../components/common";
-import { COMMISSIONS as initialCommissions } from "../../constants/mockData";
+import { type Commission } from "../../services/sheetsService";
 
 /**
  * Root component for the Client domain. Handles the landing page and the multi-step commission request form.
@@ -14,9 +14,19 @@ import { COMMISSIONS as initialCommissions } from "../../constants/mockData";
  * @param {Function} props.onBack 
  * @returns {JSX.Element} 
  */
-export function ClientPortal({ onBack }: { onBack: () => void }) {
+export function ClientPortal({ 
+  onBack, 
+  commissions, 
+  onAdd, 
+  isLoading 
+}: { 
+  onBack: () => void; 
+  commissions: Commission[]; 
+  onAdd: (newCom: Omit<Commission, "rm" | "printer" | "status" | "deadline" | "problems">) => Promise<void>; 
+  isLoading: boolean; 
+}) {
   const [step, setStep] = useState(0);
-  const [commissions, setCommissions] = useState(initialCommissions);
+
   const [form, setForm] = useState({
     name: "", email: "", clientType: "Student",
     idNumber: "", program: "", college: "CCS", department: "",
@@ -28,7 +38,7 @@ export function ClientPortal({ onBack }: { onBack: () => void }) {
   const [mockLogs, setMockLogs] = useState<string[]>([]);
 
   // Capacity validation
-  const activeCommissions = commissions.filter(c => c.status !== "Completed" && c.status !== "Rejected");
+  const activeCommissions = commissions.filter(c => c.status !== "Completed" && c.status !== "Rejected" && c.status !== "Awaiting Approval");
   const activeCount = activeCommissions.length;
   const isLabFull = activeCount >= 3;
 
@@ -82,7 +92,7 @@ export function ClientPortal({ onBack }: { onBack: () => void }) {
     return true;
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     const nextIdNum = commissions.length + 1;
     const nextId = `COM-${nextIdNum.toString().padStart(3, "0")}`;
 
@@ -90,19 +100,23 @@ export function ClientPortal({ onBack }: { onBack: () => void }) {
       id: nextId,
       client: form.name,
       clientEmail: form.email,
+      clientType: form.clientType,
+      idNumber: form.idNumber,
+      program: form.program,
+      college: form.college,
+      department: form.department,
       service: form.service,
-      file: fileName ? "Has File" : "Needs Design",
+      purpose: form.purpose,
       color: form.color,
       filament: form.filament,
-      rm: null,
-      deadline: "Pending Approval",
-      printer: null,
-      status: "Awaiting Approval",
-      submitted: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" }),
-      weight: form.weight
+      urgency: form.urgency,
+      weight: form.weight,
+      notes: form.notes,
+      file: fileName || "None (Design Needed)",
+      submitted: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" })
     };
 
-    setCommissions([...commissions, newCommission]);
+    await onAdd(newCommission);
     setMockLogs([
       `📧 Client Receipt: Confirmation email sent to ${form.email} for your "${form.service}" request.`,
       `📧 System Dispatch: Admin queue notified of new "${form.service}" commission from ${form.name}. ID: ${nextId}.`
@@ -110,32 +124,42 @@ export function ClientPortal({ onBack }: { onBack: () => void }) {
     setStep(5);
   };
 
+
   const stepsList = ["Personal Details", "Service Selection", "Commission Details", "Confirmation"];
 
   if (step === 0) {
     return (
       <div className="min-h-screen bg-white light">
-        {/* Helper Toolbar for simulating capacity */}
+        {/* Helper Toolbar for displaying capacity */}
         <div className="bg-gray-100 text-gray-700 py-1.5 px-4 text-xs font-mono flex flex-col sm:flex-row sm:items-center justify-between border-b border-gray-200 gap-2">
           <div className="flex items-center gap-1.5">
             <span className={activeCount >= 3 ? "w-2 h-2 rounded-full bg-red-500 animate-pulse" : "w-2 h-2 rounded-full bg-green-500 animate-pulse"} />
             <span>FabLab Capacity: <strong>{activeCount} / 3 Active Commissions</strong> ({activeCount >= 3 ? "FULL" : "AVAILABLE"})</span>
           </div>
-          <button 
-            onClick={() => {
-              if (activeCount >= 3) {
-                // Clear active ones to leave only 1
-                setCommissions(prev => prev.map((c, i) => i === 0 ? c : { ...c, status: "Completed" }));
-              } else {
-                // Reset to default mock data (5 active)
-                setCommissions(initialCommissions);
-              }
-            }}
-            className="text-violet-600 hover:text-violet-800 font-bold underline transition text-left"
-          >
-            {activeCount >= 3 ? "Simulate Space (Set to 1 Active)" : "Simulate Full Capacity (Reset to 5 Active)"}
-          </button>
+          {!import.meta.env.VITE_GOOGLE_SCRIPT_URL && (
+            <div className="flex gap-3">
+              <button 
+                onClick={() => {
+                  localStorage.setItem("fablab_commissions_v2", JSON.stringify([]));
+                  window.location.reload();
+                }}
+                className="text-violet-600 hover:text-violet-800 font-bold underline transition text-left"
+              >
+                Clear Database (Simulate Empty Sheet)
+              </button>
+              <button 
+                onClick={() => {
+                  localStorage.removeItem("fablab_commissions_v2");
+                  window.location.reload();
+                }}
+                className="text-violet-600 hover:text-violet-800 font-bold underline transition text-left"
+              >
+                Restore Mock Data
+              </button>
+            </div>
+          )}
         </div>
+
 
         <header className="px-6 py-4 flex items-center justify-between border-b border-gray-100">
           <div className="flex items-center gap-2">
