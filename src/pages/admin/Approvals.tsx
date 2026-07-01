@@ -1,24 +1,28 @@
-import React, { useState } from "react";
+import React from "react";
 import { Check, X, User, CheckCircle } from "lucide-react";
 import { PageHeader } from "../../components/common";
-import { PENDING_APPROVALS } from "../../constants/mockData";
+import { type Commission } from "../../services/sheetsService";
 
 /**
  * Renders the Commission Approvals view for Admins.
  * Domain: Admin
  * @returns {JSX.Element}
  */
-export function AdminApprovals() {
-  const [items, setItems] = useState(PENDING_APPROVALS);
+export function AdminApprovals({ 
+  commissions, 
+  onUpdate 
+}: { 
+  commissions: Commission[]; 
+  onUpdate: (id: string, updates: Partial<Commission>) => Promise<void>; 
+}) {
+  const items = commissions.filter(c => c.status === "Awaiting Approval");
 
-  // TODO
-  const handleApprove = (id: string) => {
-    setItems(i => i.filter(x => x.id !== id));
+  const handleApprove = async (id: string) => {
+    await onUpdate(id, { status: "Pending" });
   };
 
-  // TODO
-  const handleReject = (id: string) => {
-    setItems(i => i.filter(x => x.id !== id));
+  const handleReject = async (id: string) => {
+    await onUpdate(id, { status: "Rejected" });
   };
 
   return (
@@ -54,7 +58,7 @@ export function AdminApprovals() {
                 {/*Contact*/}
                 <div>
                   <p className="text-xs text-muted-foreground">Contact</p>
-                  <p className="text-sm text-card-foreground truncate">{item.email}</p>
+                  <p className="text-sm text-card-foreground truncate">{item.clientEmail}</p>
                 </div>
                 
                 {/*Submitted*/}

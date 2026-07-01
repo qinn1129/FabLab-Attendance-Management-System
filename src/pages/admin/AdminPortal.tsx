@@ -12,15 +12,25 @@ import { AdminModules } from "./Modules";
 import { AdminRMAccounts } from "./RMAccounts";
 import { AdminProfile } from "./Profile";
 import { AdminFAQ } from "./FAQ";
+import { type Commission } from "../../services/sheetsService";
 
 /**
  * Root component for the Admin domain. Handles authentication state and rendering the active screen.
  * @param {Object} props
  * @param {Function} props.onBack
  * @returns {JSX.Element}
- * Again, this is only temporary, i think there should be a seperate module for access or routing to the pages of admin. 
  */
-export function AdminPortal({ onBack }: { onBack: () => void }) {
+export function AdminPortal({ 
+  onBack, 
+  commissions, 
+  onUpdate, 
+  isLoading 
+}: { 
+  onBack: () => void; 
+  commissions: Commission[]; 
+  onUpdate: (id: string, updates: Partial<Commission>) => Promise<void>; 
+  isLoading: boolean; 
+}) {
   const [loggedIn, setLoggedIn] = useState(false);
   const [screen, setScreen] = useState("dashboard");
   const [email, setEmail] = useState("");
@@ -59,17 +69,17 @@ export function AdminPortal({ onBack }: { onBack: () => void }) {
 
   const renderScreen = () => {
     switch (screen) {
-      case "dashboard": return <AdminDashboard />;
+      case "dashboard": return <AdminDashboard commissions={commissions} />;
       case "rm-schedules": return <AdminRMSchedules />;
-      case "approvals": return <AdminApprovals />;
-      case "tracker": return <AdminTracker />;
+      case "approvals": return <AdminApprovals commissions={commissions} onUpdate={onUpdate} />;
+      case "tracker": return <AdminTracker commissions={commissions} onUpdate={onUpdate} />;
       case "tasks": return <AdminTasks />;
       case "announcements": return <AdminAnnouncements />;
       case "modules": return <AdminModules />;
       case "rm-accounts": return <AdminRMAccounts />;
       case "profile": return <AdminProfile />;
       case "faq": return <AdminFAQ />;
-      default: return <AdminDashboard />;
+      default: return <AdminDashboard commissions={commissions} />;
     }
   };
 
