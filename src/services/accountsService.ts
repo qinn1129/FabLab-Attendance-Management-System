@@ -16,7 +16,7 @@ export interface Account {
   motto?: string;
 }
 
-const LOCAL_STORAGE_KEY = "fablab_accounts_v1";
+// const LOCAL_STORAGE_KEY = "fablab_accounts_v1";
 
 const getScriptUrl = (): string | null => {
   const url = import.meta.env.VITE_GOOGLE_SCRIPT_URL;
@@ -26,21 +26,21 @@ const getScriptUrl = (): string | null => {
 const getSecret = () => import.meta.env.VITE_WEBAPP_SECRET || "";
 
 // Local fallback so the app still runs without a deployed backend.
-const seedLocalAccounts = (): Account[] => {
-  const existing = localStorage.getItem(LOCAL_STORAGE_KEY);
-  if (existing) {
-    try {
-      return JSON.parse(existing);
-    } catch (e) {
-      console.error("Error parsing local accounts", e);
-    }
-  }
-  const seeded: Account[] = [
-    { id: "ACC-local-admin", role: "Admin", firstName: "Domie James", lastName: "Jucutan", email: "admin@animolabs.ph", status: "Active" },
-  ];
-  localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(seeded));
-  return seeded;
-};
+  // const seedLocalAccounts = (): Account[] => {
+  //   const existing = localStorage.getItem(LOCAL_STORAGE_KEY);
+  //   if (existing) {
+  //     try {
+  //       return JSON.parse(existing);
+  //     } catch (e) {
+  //       console.error("Error parsing local accounts", e);
+  //     }
+  //   }
+  //   const seeded: Account[] = [
+  //     { id: "ACC-local-admin", role: "Admin", firstName: "Domie James", lastName: "Jucutan", email: "admin@animolabs.ph", status: "Active" },
+  //   ];
+  //   localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(seeded));
+  //   return seeded;
+  // };
 
 export const accountsService = {
   /**
@@ -51,11 +51,13 @@ export const accountsService = {
   async login(email: string, password: string): Promise<{ success: boolean; user?: Account; error?: string }> {
     const url = getScriptUrl();
 
-    if (!url) {
-      const accounts = seedLocalAccounts();
-      const match = accounts.find(a => a.email.toLowerCase() === email.trim().toLowerCase());
-      if (!match) return { success: false, error: "Invalid email or password." };
-      return { success: true, user: match };
+     if (!url) {
+      console.warn(
+        "[accountsService] VITE_GOOGLE_SCRIPT_URL is not set. " +
+        "Login cannot be verified without the backend — check your .env " +
+        "file and restart the Vite dev server (env changes require a restart)."
+      );
+      return { success: false, error: "Login is unavailable — the app is not connected to the account database." };
     }
 
     try {
@@ -71,6 +73,7 @@ export const accountsService = {
       });
       const data = await response.json();
       if (data.error) return { success: false, error: data.error };
+      if (!data.user) return { success: false, error: "Unexpected response from server." };
       return { success: true, user: data.user as Account };
     } catch (error) {
       console.error("[accountsService] Login request failed.", error);
@@ -88,23 +91,9 @@ export const accountsService = {
   }): Promise<{ success: boolean; message?: string; error?: string }> {
     const url = getScriptUrl();
 
-    if (!url) {
-      const accounts = seedLocalAccounts();
-      if (accounts.some(a => a.email.toLowerCase() === payload.email.toLowerCase())) {
-        return { success: false, error: "An account with that email already exists." };
-      }
-      accounts.push({
-        id: "ACC-local-" + Date.now(),
-        role: "ResidentMaker",
-        firstName: payload.firstName,
-        lastName: payload.lastName,
-        email: payload.email,
-        status: "Pending",
-        program: payload.program,
-        year: payload.year
-      });
-      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(accounts));
-      return { success: true, message: "Registered. Awaiting Admin approval." };
+     if (!url) {
+      console.warn("[accountsService] VITE_GOOGLE_SCRIPT_URL is not set. Registration cannot be saved.");
+      return { success: false, error: "Registration is unavailable — the app is not connected to the account database." };
     }
 
     try {
@@ -125,7 +114,10 @@ export const accountsService = {
   /** Fetches all accounts (passwordHash/salt are stripped server-side). */
   async fetchAccounts(): Promise<Account[]> {
     const url = getScriptUrl();
-    if (!url) return seedLocalAccounts();
+    if (!url) {
+      console.warn("[accountsService] VITE_GOOGLE_SCRIPT_URL is not set. Returning an empty account list.");
+      return [];
+    }
 
     try {
       const fetchUrl = `${url}${url.includes("?") ? "&" : "?"}secret=${encodeURIComponent(getSecret())}&sheet=accounts`;
@@ -134,8 +126,8 @@ export const accountsService = {
       if (data.error) throw new Error(data.error);
       return data as Account[];
     } catch (error) {
-      console.error("[accountsService] Failed to fetch accounts. Falling back to local.", error);
-      return seedLocalAccounts();
+      console.error("[accountsService] Failed to fetch accounts.", error);
+      return [];
     }
   },
 
@@ -150,28 +142,32 @@ export const accountsService = {
   },
 
   /** Used by Admin to approve/reject/deactivate an RM, or edit hours/schedule. */
-  async updateAccount(id: string, updates: Partial<Account>): Promise<void> {
+  async updateAccount(id: string, updates: Partial<Account>): Promise<{ success: boolean; error?: string }> {
     const url = getScriptUrl();
     if (!url) {
-      const accounts = seedLocalAccounts();
-      const idx = accounts.findIndex(a => a.id === id);
-      if (idx > -1) {
-        accounts[idx] = { ...accounts[idx], ...updates };
-        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(accounts));
-      }
-      return;
+      console.warn("[accountsService] VITE_GOOGLE_SCRIPT_URL is not set. Update cannot be saved.");
+      return { success: false, error: "Update is unavailable — the app is not connected to the account database." };
     }
 
     try {
-      await fetch(`${url}?sheet=accounts`, {
+      const response = await fetch(`${url}?sheet=accounts`, {
         method: "POST",
-        mode: "no-cors",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "text/plain" },
         body: JSON.stringify({ secret: getSecret(), action: "update", id, data: updates })
       });
+      const data = await response.json();
+      if (data.error) return { success: false, error: data.error };
+      return { success: true };
     } catch (error) {
       console.error("[accountsService] Failed to update account.", error);
+      return { success: false, error: "Unable to reach the server. Please try again." };
     }
+  },
+
+  /** Convenience wrapper — fetches only Resident Maker accounts. */
+  async fetchResidentMakers(): Promise<Account[]> {
+    const accounts = await this.fetchAccounts();
+    return accounts.filter(a => a.role === "ResidentMaker");
   },
 
     /** Re-hashes and stores a new password server-side after verifying the old one. */
@@ -195,6 +191,22 @@ export const accountsService = {
       console.error("[accountsService] Change password request failed.", error);
       return { success: false, error: "Unable to reach the server. Please try again." };
     }
-  }
+  },
 };
+
+/** Parses the JSON-string "schedule" field into an array of day abbreviations (e.g. ["Mon","Wed"]). */
+export function parseScheduleDays(schedule?: string): string[] {
+  if (!schedule) return [];
+  try {
+    const parsed = JSON.parse(schedule);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+/** Serializes a day array back into the JSON string stored in the "schedule" column. */
+export function stringifyScheduleDays(days: string[]): string {
+  return JSON.stringify(days);
+}
 

@@ -45,13 +45,25 @@ export function AdminRMAccounts() {
     loadAccounts();
   };
 
+  const [actionError, setActionError] = useState("");
+
   const handleApprove = async (id: string) => {
-    await accountsService.updateAccount(id, { status: "Active" });
+    setActionError("");
+    const result = await accountsService.updateAccount(id, { status: "Active" });
+    if (!result.success) {
+      setActionError(result.error || "Failed to approve account.");
+      return;
+    }
     loadAccounts();
   };
 
   const handleDeactivate = async (id: string) => {
-    await accountsService.updateAccount(id, { status: "Inactive" });
+    setActionError("");
+    const result = await accountsService.updateAccount(id, { status: "Inactive" });
+    if (!result.success) {
+      setActionError(result.error || "Failed to deactivate account.");
+      return;
+    }
     loadAccounts();
   };
 
@@ -67,6 +79,8 @@ export function AdminRMAccounts() {
       </div>
 
       {tab === "list" && (
+        <>
+        {actionError && <p className="text-red-500 text-sm mb-3">{actionError}</p>}
         <div className="bg-card rounded-xl border border-border overflow-hidden">
           <table className="w-full text-sm">
             <thead>
@@ -104,6 +118,7 @@ export function AdminRMAccounts() {
             </tbody>
           </table>
         </div>
+        </>
       )}
 
       {/*For requests*/}

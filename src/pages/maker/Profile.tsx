@@ -21,13 +21,17 @@ export function MakerProfile({
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState("");
 
-  const handleSave = async () => {
-    setSaving(true);
-    setSaveMsg("");
-    await accountsService.updateAccount(account.id, form);
-    setSaving(false);
-    setSaveMsg("Saved!");
-    onAccountUpdate({ ...account, ...form });
+   const handleSave = async () => {
+     setSaving(true);
+     setSaveMsg("");
+     const result = await accountsService.updateAccount(account.id, form);
+     setSaving(false);
+     if (!result.success) {
+       setSaveMsg(result.error || "Failed to save.");
+       return;
+     }
+     setSaveMsg("Saved!");
+     onAccountUpdate({ ...account, ...form });
   };
 
   return (

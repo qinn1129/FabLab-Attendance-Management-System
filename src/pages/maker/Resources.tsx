@@ -1,7 +1,9 @@
 import React, { useState } from "react";
+import { useEffect } from "react";
 import { Check, Pin, Youtube, Link2, ChevronDown } from "lucide-react";
 import { PageHeader } from "../../components/common";
-import { RESIDENT_MAKERS, ANNOUNCEMENTS_DATA, MODULES_DATA, FAQS_DATA } from "../../constants/mockData";
+import { ANNOUNCEMENTS_DATA, MODULES_DATA, FAQS_DATA } from "../../constants/mockData";
+import { accountsService, parseScheduleDays, type Account } from "../../services/accountsService";
 
 /**
  * Global resources view for Resident Makers.
@@ -11,7 +13,12 @@ import { RESIDENT_MAKERS, ANNOUNCEMENTS_DATA, MODULES_DATA, FAQS_DATA } from "..
 export function MakerResources() {
   const [tab, setTab] = useState<"schedule"|"announcements"|"modules"|"faq">("schedule");
   const [faqOpen, setFaqOpen] = useState<number | null>(null);
+  const [makers, setMakers] = useState<Account[]>([]);
   const days = ["Mon","Tue","Wed","Thu","Fri"];
+
+  useEffect(() => {
+    accountsService.fetchResidentMakers().then(setMakers);
+  }, []);
 
   return (
     <div className="p-6">
@@ -35,16 +42,19 @@ export function MakerResources() {
               </tr>
             </thead>
             <tbody>
-              {RESIDENT_MAKERS.map(rm => (
-                <tr key={rm.id} className="border-b border-muted hover:bg-muted/50 transition">
-                  <td className="px-4 py-3 font-medium text-foreground">{rm.name}</td>
-                  {days.map(d => (
-                    <td key={d} className="px-3 py-3 text-center">
-                      {rm.schedule.includes(d) ? <div className="w-5 h-5 rounded bg-emerald-500/20 mx-auto flex items-center justify-center"><Check className="w-3 h-3 text-emerald-500" /></div> : <div className="w-5 h-5 rounded bg-muted/50 mx-auto" />}
-                    </td>
-                  ))}
-                </tr>
-              ))}
+              {makers.map(rm => {
+                const scheduleDays = parseScheduleDays(rm.schedule);
+                return (
+                 <tr key={rm.id} className="border-b border-muted hover:bg-muted/50 transition">
+                  <td className="px-4 py-3 font-medium text-foreground">{rm.firstName} {rm.lastName}</td>
+                   {days.map(d => (
+                     <td key={d} className="px-3 py-3 text-center">
+                      {scheduleDays.includes(d) ? <div className="w-5 h-5 rounded bg-emerald-500/20 mx-auto flex items-center justify-center"><Check className="w-3 h-3 text-emerald-500" /></div> : <div className="w-5 h-5 rounded bg-muted/50 mx-auto" />}
+                     </td>
+                   ))}
+                 </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

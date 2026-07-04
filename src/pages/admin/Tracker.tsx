@@ -1,7 +1,8 @@
 import React, { useState } from "react";
+import { useEffect } from "react";
 import { Check, Edit2, X } from "lucide-react";
 import { PageHeader, StatusBadge } from "../../components/common";
-import { RESIDENT_MAKERS } from "../../constants/mockData";
+import { accountsService, type Account } from "../../services/accountsService";
 import { type Commission } from "../../services/sheetsService";
 
 /**
@@ -24,6 +25,12 @@ export function AdminTracker({
     problems: string;
     status: string;
   } | null>(null);
+
+  const [makers, setMakers] = useState<Account[]>([]);
+
+  useEffect(() => {
+    accountsService.fetchResidentMakers().then(setMakers);
+  }, []);
 
   const startEdit = (c: Commission) => {
     setEditId(c.id);
@@ -101,8 +108,8 @@ export function AdminTracker({
                         className="text-xs border border-border bg-background text-foreground rounded px-1.5 py-1 outline-none focus:ring-1 focus:ring-emerald-400 w-full"
                       >
                         <option value="">Unassigned</option>
-                        {RESIDENT_MAKERS.filter(r => r.status === "Active").map(r => (
-                          <option key={r.id} value={r.name}>{r.name}</option>
+                        {makers.filter(r => r.status === "Active").map(r => (
+                          <option key={r.id} value={`${r.firstName} ${r.lastName}`}>{r.firstName} {r.lastName}</option>
                         ))}
                       </select>
                     ) : (

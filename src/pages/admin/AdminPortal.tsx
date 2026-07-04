@@ -13,7 +13,7 @@ import { AdminRMAccounts } from "./RMAccounts";
 import { AdminProfile } from "./Profile";
 import { AdminFAQ } from "./FAQ";
 import { accountsService, type Account } from "../../services/accountsService";
-import { rememberMe } from "../../lib/RememberMe";
+import { rememberMe } from "../../lib/rememberMe";
 import { type Commission } from "../../services/sheetsService";
 
 

@@ -2,28 +2,49 @@ import React, { useState } from "react";
 import { Clock, AlertTriangle } from "lucide-react";
 import { PageHeader, Select, Input } from "../../components/common";
 import { cn } from "../../lib/utils";
+import { accountsService, parseScheduleDays, stringifyScheduleDays, type Account } from "../../services/accountsService";
 
-/**
- * RM Attendance logging and request view.
- * Domain: Maker
- * @returns {JSX.Element}
- */
-export function MakerAttendance() {
+export function MakerAttendance({
+  account,
+  onAccountUpdate
+}: {
+  account: Account;
+  onAccountUpdate: (account: Account) => void;
+}) {
   const [clockedIn, setClockedIn] = useState(true);
   const [clockInTime] = useState("9:58 AM");
   const [tab, setTab] = useState<"clock"|"schedule"|"request">("clock");
-  const [schedDays, setSchedDays] = useState<string[]>(["Mon","Wed","Fri"]);
+  const [schedDays, setSchedDays] = useState<string[]>(parseScheduleDays(account.schedule));
+  const [savingSchedule, setSavingSchedule] = useState(false);
+  const [scheduleSaved, setScheduleSaved] = useState("");
   const [reqForm, setReqForm] = useState({ type: "", date: "", reason: "" });
+  const [requestSubmitted, setRequestSubmitted] = useState("");
   const days = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
   const isFriday = new Date().getDay() === 5;
 
-  // TODO
   const handleClockToggle = () => {
     setClockedIn(o => !o);
   };
 
-  // TODO
+  const saveSchedule = async () => {
+    setSavingSchedule(true);
+    setScheduleSaved("");
+    const updates = { schedule: stringifyScheduleDays(schedDays) };
+    const result = await accountsService.updateAccount(account.id, updates);
+    setSavingSchedule(false);
+    if (!result.success) {
+      setScheduleSaved(""); // clear on failure — reuse a dedicated error state if you prefer
+      alert(result.error || "Failed to save schedule.");
+      return;
+    }
+    setScheduleSaved("Schedule saved!");
+    onAccountUpdate({ ...account, ...updates });
+  };
+
   const submitRequest = () => {
+    // Attendance Approval Requests need a dedicated sheet/action on the
+    // backend (separate from account data) — tracked as a follow-up.
+    setRequestSubmitted("Submitted. This will route to Admin review once attendance requests are wired up on the backend.");
   };
 
   return (
@@ -37,7 +58,6 @@ export function MakerAttendance() {
         ))}
       </div>
 
-      {/*Clocking in and Clocking out*/}
       {tab === "clock" && (
         <div className="max-w-sm">
           <div className="bg-card rounded-2xl border border-border p-8 text-center mb-4">
@@ -47,7 +67,7 @@ export function MakerAttendance() {
             <p className="text-2xl font-bold text-foreground mb-1 font-mono">
               {new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
             </p>
-            <p className="text-muted-foreground text-sm mb-1">Mon, June 23, 2026</p>
+            <p className="text-muted-foreground text-sm mb-1">{new Date().toDateString()}</p>
             {clockedIn && <p className="text-emerald-500 text-sm font-medium">Clocked in at {clockInTime}</p>}
           </div>
           <button
@@ -64,7 +84,6 @@ export function MakerAttendance() {
         </div>
       )}
 
-      {/*Schedule*/}
       {tab === "schedule" && (
         <div className="max-w-md bg-card rounded-xl border border-border p-6">
           {isFriday && (
@@ -84,21 +103,19 @@ export function MakerAttendance() {
                  {d}
                </button>
             ))}
-
           </div>
           <div className="bg-muted rounded-lg p-3 mb-4">
             <p className="text-xs text-muted-foreground mb-1">Selected days:</p>
             <p className="text-sm font-medium text-card-foreground">{schedDays.length > 0 ? schedDays.join(", ") : "None selected"}</p>
           </div>
-          
-          <button className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2.5 rounded-xl transition">
-            Save Schedule
-          </button>
 
+          {scheduleSaved && <p className="text-emerald-600 text-sm mb-3">{scheduleSaved}</p>}
+          <button onClick={saveSchedule} disabled={savingSchedule} className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white font-semibold py-2.5 rounded-xl transition">
+            {savingSchedule ? "Saving..." : "Save Schedule"}
+          </button>
         </div>
       )}
 
-      {/*Attendance Request Approval*/}
       {tab === "request" && (
         <div className="max-w-md bg-card rounded-xl border border-border p-6">
           <h3 className="font-semibold text-foreground mb-4">Submit Attendance Request</h3>
@@ -121,6 +138,7 @@ export function MakerAttendance() {
               />
             </div>
           </div>
+          {requestSubmitted && <p className="text-emerald-600 text-sm mt-3">{requestSubmitted}</p>}
           <button onClick={submitRequest} className="mt-5 w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2.5 rounded-xl transition">
             Submit Request
           </button>

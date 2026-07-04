@@ -1,6 +1,7 @@
 import React, { useState } from "react";
+import { useEffect } from "react";
 import { PageHeader, Select, StatusBadge } from "../../components/common";
-import { RESIDENT_MAKERS } from "../../constants/mockData";
+import { accountsService, type Account } from "../../services/accountsService";
 import { cn } from "../../lib/utils";
 
 /**
@@ -11,6 +12,11 @@ import { cn } from "../../lib/utils";
 export function AdminTasks() {
   const [tab, setTab] = useState<"selected" | "all">("selected");
   const [selectedRM, setSelectedRM] = useState("Juan dela Cruz");
+  const [makers, setMakers] = useState<Account[]>([]);
+
+  useEffect(() => {
+    accountsService.fetchResidentMakers().then(setMakers);
+  }, []);
 
   // hardcoded, feel free to edit the fields here for the db
   const tasks: Record<string, { id: number; task: string; deadline: string; status: string }[]> = {
@@ -47,7 +53,7 @@ export function AdminTasks() {
 
       {tab === "selected" && (
         <div className="mb-4">
-          <Select label="Select Resident Maker" value={selectedRM} onChange={setSelectedRM} options={RESIDENT_MAKERS.filter(r => r.status === "Active").map(r => r.name)} />
+          <Select label="Select Resident Maker" value={selectedRM} onChange={setSelectedRM} options={makers.filter(r => r.status === "Active").map(r => `${r.firstName} ${r.lastName}`)} />
         </div>
       )}
 
