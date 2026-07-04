@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Users, ArrowLeft } from "lucide-react";
 import { Input } from "../../components/common";
 import { MakerLayout } from "../../layouts/MakerLayout";
@@ -8,6 +8,7 @@ import { MakerCommissions } from "./Commissions";
 import { MakerResources } from "./Resources";
 import { MakerProfile } from "./Profile";
 import { accountsService, type Account } from "../../services/accountsService";
+import { rememberMe } from "../../lib/RememberMe";
 import { type Commission } from "../../services/sheetsService";
 
 export function MakerPortal({
@@ -25,9 +26,11 @@ export function MakerPortal({
   const [loggedIn, setLoggedIn] = useState(false);
   const [screen, setScreen] = useState("dashboard");
   const [account, setAccount] = useState<Account | null>(null);
+  const [checkingSession, setCheckingSession] = useState(true);
 
   const [email, setEmail] = useState("");
   const [pass, setPass] = useState("");
+  const [remember, setRemember] = useState(false);
   const [loginError, setLoginError] = useState("");
   const [isLoggingIn, setIsLoggingIn] = useState(false);
 
@@ -35,6 +38,24 @@ export function MakerPortal({
   const [regError, setRegError] = useState("");
   const [regSuccess, setRegSuccess] = useState("");
   const [isRegistering, setIsRegistering] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      const remembered = rememberMe.get("ResidentMaker");
+      if (!remembered) {
+        setCheckingSession(false);
+        return;
+      }
+      const found = await accountsService.getAccountById(remembered.id);
+      if (found && found.role === "ResidentMaker" && found.status === "Active") {
+        setAccount(found);
+        setLoggedIn(true);
+      } else {
+        rememberMe.clear("ResidentMaker");
+      }
+      setCheckingSession(false);
+    })();
+  }, []);
 
   const handleLogin = async () => {
     setLoginError("");
@@ -49,6 +70,9 @@ export function MakerPortal({
     if (result.user.role !== "ResidentMaker") {
       setLoginError("This account is not a Resident Maker account.");
       return;
+    }
+    if (remember) {
+      rememberMe.save("ResidentMaker", result.user.id);
     }
     setAccount(result.user);
     setLoggedIn(true);
@@ -90,12 +114,22 @@ export function MakerPortal({
     setRegForm({ firstName: "", lastName: "", email: "", password: "", confirmPassword: "", program: "", year: "" });
   };
 
-  const handleLogout = () => {
-    setLoggedIn(false);
-    setAccount(null);
-    setEmail("");
-    setPass("");
-  };
+   const handleLogout = () => {
+     rememberMe.clear("ResidentMaker");
+     setLoggedIn(false);
+     setAccount(null);
+     setEmail("");
+     setPass("");
+     setRemember(false);
+   };
+
+  if (checkingSession) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[linear-gradient(135deg,_#064e3b_0%,_#065f46_60%,_#0f172a_100%)]">
+        <p className="text-white/50 text-sm font-mono">Loading...</p>
+      </div>
+    );
+  }
 
   if (!loggedIn) {
     if (authView === "register") {
@@ -164,6 +198,15 @@ export function MakerPortal({
             <Input label="Email Address" type="email" value={email} onChange={setEmail} placeholder="name@dlsu.edu.ph" />
             <Input label="Password" type="password" value={pass} onChange={setPass} placeholder="••••••••" />
           </div>
+              <label className="flex items-center gap-2 mb-4 cursor-pointer select-none">
+              <input
+              type="checkbox"
+              checked={remember}
+              onChange={e => setRemember(e.target.checked)}
+              className="w-4 h-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-400"
+              />
+              <span className="text-sm text-gray-600">Remember me</span>
+              </label>
           {loginError && <p className="text-red-500 text-sm mb-3">{loginError}</p>}
           <button onClick={handleLogin} disabled={!email || !pass || isLoggingIn} className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white font-semibold py-2.5 rounded-xl transition">
             {isLoggingIn ? "Signing In..." : "Sign In"}

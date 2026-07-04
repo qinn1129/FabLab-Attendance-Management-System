@@ -139,6 +139,16 @@ export const accountsService = {
     }
   },
 
+  /**
+   * Looks up a single account by id, for "Remember Me" auto-login on
+   * page load. Re-checks status server-side data (via fetchAccounts)
+   * so a Deactivated/Pending account can't silently stay "logged in".
+   */
+  async getAccountById(id: string): Promise<Account | null> {
+    const accounts = await this.fetchAccounts();
+    return accounts.find(a => a.id === id) || null;
+  },
+
   /** Used by Admin to approve/reject/deactivate an RM, or edit hours/schedule. */
   async updateAccount(id: string, updates: Partial<Account>): Promise<void> {
     const url = getScriptUrl();
