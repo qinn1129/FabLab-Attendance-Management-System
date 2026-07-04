@@ -1,7 +1,8 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { PageHeader, StatusBadge, Input } from "../../components/common";
 import { RESIDENT_MAKERS } from "../../constants/mockData";
 import { cn } from "../../lib/utils";
+import { accountsService, type Account } from "../../services/accountsService";
 
 /**
  * RM Account Management view for Admins.
@@ -10,7 +11,20 @@ import { cn } from "../../lib/utils";
  */
 export function AdminRMAccounts() {
   const [tab, setTab] = useState<"list"|"requests"|"register">("list");
-  const [regForm, setRegForm] = useState({ firstName: "", lastName: "", email: "" }); // tentative, baka theres other stuff need be added for
+  const [regForm, setRegForm] = useState({ firstName: "", lastName: "", email: "", password: "", program: "", year: "" });
+  const [regError, setRegError] = useState("");
+  const [regSuccess, setRegSuccess] = useState("");
+  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [loadingAccounts, setLoadingAccounts] = useState(true);
+
+  const loadAccounts = async () => {
+    setLoadingAccounts(true);
+    const data = await accountsService.fetchAccounts();
+    setAccounts(data.filter(a => a.role === "ResidentMaker"));
+    setLoadingAccounts(false);
+  };
+
+  useEffect(() => { loadAccounts(); }, []);
 
   // hardcoded data
   const [requests] = useState([
@@ -18,9 +32,27 @@ export function AdminRMAccounts() {
     { id: 2, rm: "Ana Reyes", type: "Missed Schedule", date: "Jun 20", reason: "Family emergency.", status: "Approved" },
   ]);
 
-  // TODO
-  const handleRegister = () => {
-    setRegForm({ firstName: "", lastName: "", email: "" });
+  const handleRegister = async () => {
+    setRegError("");
+    setRegSuccess("");
+    const result = await accountsService.registerRM(regForm);
+    if (!result.success) {
+      setRegError(result.error || "Registration failed.");
+      return;
+    }
+    setRegSuccess(result.message || "Registered successfully.");
+    setRegForm({ firstName: "", lastName: "", email: "", password: "", program: "", year: "" });
+    loadAccounts();
+  };
+
+  const handleApprove = async (id: string) => {
+    await accountsService.updateAccount(id, { status: "Active" });
+    loadAccounts();
+  };
+
+  const handleDeactivate = async (id: string) => {
+    await accountsService.updateAccount(id, { status: "Inactive" });
+    loadAccounts();
   };
 
   return (
@@ -39,7 +71,7 @@ export function AdminRMAccounts() {
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-muted border-b border-border">
-                {["Name","Email","Program","Year","Total Hours","Status","Actions"].map(h => (
+                {["Name","Email","Program","Year","Status","Actions"].map(h => (
                   <th key={h} className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">{h}</th>
                 ))}
               </tr>
@@ -47,16 +79,25 @@ export function AdminRMAccounts() {
 
             {/*Displayin of RM Information*/}    
             <tbody>
-              {RESIDENT_MAKERS.map(rm => (
+              {loadingAccounts ? (
+                <tr><td colSpan={6} className="px-4 py-6 text-center text-muted-foreground text-sm">Loading...</td></tr>
+              ) : accounts.length === 0 ? (
+                <tr><td colSpan={6} className="px-4 py-6 text-center text-muted-foreground text-sm">No Resident Makers yet.</td></tr>
+              ) : accounts.map(rm => (
                 <tr key={rm.id} className="border-b border-muted hover:bg-muted/50 transition">
-                  <td className="px-4 py-3 font-semibold text-foreground whitespace-nowrap">{rm.name}</td>
+                  <td className="px-4 py-3 font-semibold text-foreground whitespace-nowrap">{rm.firstName} {rm.lastName}</td>
                   <td className="px-4 py-3 text-muted-foreground text-xs">{rm.email}</td>
-                  <td className="px-4 py-3 text-muted-foreground text-xs">{rm.program}</td>
-                  <td className="px-4 py-3 text-center font-mono">{rm.year}</td>
-                  <td className="px-4 py-3 text-center font-mono font-semibold text-card-foreground">{rm.totalHours}h</td>
+                  <td className="px-4 py-3 text-muted-foreground text-xs">{rm.program || "—"}</td>
+                  <td className="px-4 py-3 text-center font-mono">{rm.year || "—"}</td>
                   <td className="px-4 py-3"><StatusBadge status={rm.status} /></td>
                   <td className="px-4 py-3">
-                    <button className="text-xs text-emerald-600 hover:text-emerald-700 font-medium">View Profile</button>
+                    {rm.status === "Pending" ? (
+                      <button onClick={() => handleApprove(rm.id)} className="text-xs text-emerald-600 hover:text-emerald-700 font-medium">Approve</button>
+                    ) : rm.status === "Active" ? (
+                      <button onClick={() => handleDeactivate(rm.id)} className="text-xs text-red-500 hover:text-red-600 font-medium">Deactivate</button>
+                    ) : (
+                      <span className="text-xs text-muted-foreground italic">—</span>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -105,8 +146,15 @@ export function AdminRMAccounts() {
               <Input label="Last Name" value={regForm.lastName} onChange={v => setRegForm(f => ({ ...f, lastName: v }))} placeholder="e.g. dela Cruz" required />
             </div>
             <Input label="Email Address" type="email" value={regForm.email} onChange={v => setRegForm(f => ({ ...f, email: v }))} placeholder="name@dlsu.edu.ph" required />
+            <Input label="Temporary Password" type="password" value={regForm.password} onChange={v => setRegForm(f => ({ ...f, password: v }))} placeholder="••••••••" required />
+            <div className="grid grid-cols-2 gap-3">
+              <Input label="Program" value={regForm.program} onChange={v => setRegForm(f => ({ ...f, program: v }))} placeholder="e.g. BSCS-ST" />
+              <Input label="Year Level" value={regForm.year} onChange={v => setRegForm(f => ({ ...f, year: v }))} placeholder="e.g. 3rd Year" />
+            </div>
           </div>
-          <button onClick={handleRegister} className="mt-5 w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2.5 rounded-xl transition">
+          {regError && <p className="text-red-500 text-sm mt-3">{regError}</p>}
+          {regSuccess && <p className="text-emerald-600 text-sm mt-3">{regSuccess}</p>}
+          <button onClick={handleRegister} disabled={!regForm.firstName || !regForm.lastName || !regForm.email || !regForm.password} className="mt-5 w-full bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white font-semibold py-2.5 rounded-xl transition">
             Create RM Account
           </button>
         </div>

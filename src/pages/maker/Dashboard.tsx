@@ -3,24 +3,30 @@ import { Clock, Package, Pin } from "lucide-react";
 import { PageHeader, StatCard, StatusBadge } from "../../components/common";
 import { ANNOUNCEMENTS_DATA } from "../../constants/mockData";
 import { type Commission } from "../../services/sheetsService";
+import { type Account } from "../../services/accountsService";
+
+const WEEKLY_HOURS_TARGET = 20;
 
 /**
  * Resident Maker Dashboard view.
  * Domain: Maker
  * @returns {JSX.Element}
  */
-export function MakerDashboard({ 
-  commissions, 
-  makerName 
-}: { 
-  commissions: Commission[]; 
-  makerName: string; 
+export function MakerDashboard({
+  commissions,
+  account
+}: {
+  commissions: Commission[];
+  account: Account;
 }) {
+  const makerName = `${account.firstName} ${account.lastName}`;
   const myCommissions = commissions.filter(c => c.rm === makerName);
   const activeCount = myCommissions.filter(c => c.status === "In Progress" || c.status === "Pending").length;
   const completedCount = myCommissions.filter(c => c.status === "Completed").length;
 
-  const firstName = makerName.split(" ")[0];
+  const firstName = account.firstName;
+  const hoursThisWeek = Number(account.hoursWeek) || 0;
+  const totalHours = Number(account.totalHours) || 0;
 
   return (
     <div className="p-6">
@@ -29,8 +35,8 @@ export function MakerDashboard({
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <StatCard label="My Active Jobs" value={activeCount} sub="In Progress / Pending" color="text-blue-600" />
         <StatCard label="Completed" value={completedCount} sub="Synced from Sheets" color="text-emerald-600" />
-        <StatCard label="Hours This Week" value="14h" sub="of 20h target" color="text-foreground" />
-        <StatCard label="Total Hours" value="203h" sub="Cumulative" color="text-violet-600" />
+        <StatCard label="Hours This Week" value={`${hoursThisWeek}h`} sub={`of ${WEEKLY_HOURS_TARGET}h target`} color="text-foreground" />
+        <StatCard label="Total Hours" value={`${totalHours}h`} sub="Cumulative" color="text-violet-600" />
       </div>
 
       {/*Today's Schedule*/}

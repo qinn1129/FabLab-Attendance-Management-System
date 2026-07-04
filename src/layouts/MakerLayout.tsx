@@ -23,6 +23,7 @@ interface MakerLayoutProps {
   currentScreen: string;
   setScreen: (screen: string) => void;
   onLogout: () => void;
+  makerName: string;
 }
 
 /**
@@ -30,7 +31,7 @@ interface MakerLayoutProps {
  * @param {MakerLayoutProps} props
  * @returns {JSX.Element}
  */
-export function MakerLayout({ children, currentScreen, setScreen, onLogout }: MakerLayoutProps) {
+export function MakerLayout({ children, currentScreen, setScreen, onLogout, makerName }: MakerLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
   return (
@@ -39,7 +40,7 @@ export function MakerLayout({ children, currentScreen, setScreen, onLogout }: Ma
         <div className="flex items-center gap-2 px-3 py-4 border-b border-sidebar-border">
           {sidebarOpen && (
             <div className="flex-1 min-w-0">
-              <p className="text-sidebar-foreground text-sm font-bold truncate">Juan dela Cruz</p>
+              <p className="text-sidebar-foreground text-sm font-bold truncate">{makerName}</p>
               <p className="text-sidebar-primary text-xs font-mono">Resident Maker</p>
             </div>
           )}

@@ -1,0 +1,190 @@
+export interface Account {
+  id: string;
+  role: "Admin" | "ResidentMaker";
+  firstName: string;
+  lastName: string;
+  email: string;
+  status: "Active" | "Pending" | "On Leave" | "Inactive";
+  program?: string;
+  year?: string;
+  schedule?: string;
+  hoursWeek?: number;
+  totalHours?: number;
+  createdAt?: string;
+  description?: string;
+  hobbies?: string;
+  motto?: string;
+}
+
+const LOCAL_STORAGE_KEY = "fablab_accounts_v1";
+
+const getScriptUrl = (): string | null => {
+  const url = import.meta.env.VITE_GOOGLE_SCRIPT_URL;
+  return url && url.trim() !== "" ? url.trim() : null;
+};
+
+const getSecret = () => import.meta.env.VITE_WEBAPP_SECRET || "";
+
+// Local fallback so the app still runs without a deployed backend.
+const seedLocalAccounts = (): Account[] => {
+  const existing = localStorage.getItem(LOCAL_STORAGE_KEY);
+  if (existing) {
+    try {
+      return JSON.parse(existing);
+    } catch (e) {
+      console.error("Error parsing local accounts", e);
+    }
+  }
+  const seeded: Account[] = [
+    { id: "ACC-local-admin", role: "Admin", firstName: "Domie James", lastName: "Jucutan", email: "admin@animolabs.ph", status: "Active" },
+  ];
+  localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(seeded));
+  return seeded;
+};
+
+export const accountsService = {
+  /**
+   * Attempts login against the Apps Script "login" action.
+   * Falls back to a no-op local check ONLY when no script URL is
+   * configured, so local dev still works.
+   */
+  async login(email: string, password: string): Promise<{ success: boolean; user?: Account; error?: string }> {
+    const url = getScriptUrl();
+
+    if (!url) {
+      const accounts = seedLocalAccounts();
+      const match = accounts.find(a => a.email.toLowerCase() === email.trim().toLowerCase());
+      if (!match) return { success: false, error: "Invalid email or password." };
+      return { success: true, user: match };
+    }
+
+    try {
+      const response = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain" }, // avoids CORS preflight, per existing pattern
+        body: JSON.stringify({
+          secret: getSecret(),
+          action: "login",
+          email: email.trim(),
+          password
+        })
+      });
+      const data = await response.json();
+      if (data.error) return { success: false, error: data.error };
+      return { success: true, user: data.user as Account };
+    } catch (error) {
+      console.error("[accountsService] Login request failed.", error);
+      return { success: false, error: "Unable to reach the server. Please try again." };
+    }
+  },
+
+  /**
+   * Resident Maker self-registration. New accounts land as "Pending"
+   * until an Admin approves them.
+   */
+  async registerRM(payload: {
+    firstName: string; lastName: string; email: string; password: string;
+    program?: string; year?: string;
+  }): Promise<{ success: boolean; message?: string; error?: string }> {
+    const url = getScriptUrl();
+
+    if (!url) {
+      const accounts = seedLocalAccounts();
+      if (accounts.some(a => a.email.toLowerCase() === payload.email.toLowerCase())) {
+        return { success: false, error: "An account with that email already exists." };
+      }
+      accounts.push({
+        id: "ACC-local-" + Date.now(),
+        role: "ResidentMaker",
+        firstName: payload.firstName,
+        lastName: payload.lastName,
+        email: payload.email,
+        status: "Pending",
+        program: payload.program,
+        year: payload.year
+      });
+      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(accounts));
+      return { success: true, message: "Registered. Awaiting Admin approval." };
+    }
+
+    try {
+      const response = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain" },
+        body: JSON.stringify({ secret: getSecret(), action: "registerRM", ...payload })
+      });
+      const data = await response.json();
+      if (data.error) return { success: false, error: data.error };
+      return { success: true, message: data.message };
+    } catch (error) {
+      console.error("[accountsService] Registration request failed.", error);
+      return { success: false, error: "Unable to reach the server. Please try again." };
+    }
+  },
+
+  /** Fetches all accounts (passwordHash/salt are stripped server-side). */
+  async fetchAccounts(): Promise<Account[]> {
+    const url = getScriptUrl();
+    if (!url) return seedLocalAccounts();
+
+    try {
+      const fetchUrl = `${url}${url.includes("?") ? "&" : "?"}secret=${encodeURIComponent(getSecret())}&sheet=accounts`;
+      const response = await fetch(fetchUrl);
+      const data = await response.json();
+      if (data.error) throw new Error(data.error);
+      return data as Account[];
+    } catch (error) {
+      console.error("[accountsService] Failed to fetch accounts. Falling back to local.", error);
+      return seedLocalAccounts();
+    }
+  },
+
+  /** Used by Admin to approve/reject/deactivate an RM, or edit hours/schedule. */
+  async updateAccount(id: string, updates: Partial<Account>): Promise<void> {
+    const url = getScriptUrl();
+    if (!url) {
+      const accounts = seedLocalAccounts();
+      const idx = accounts.findIndex(a => a.id === id);
+      if (idx > -1) {
+        accounts[idx] = { ...accounts[idx], ...updates };
+        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(accounts));
+      }
+      return;
+    }
+
+    try {
+      await fetch(`${url}?sheet=accounts`, {
+        method: "POST",
+        mode: "no-cors",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ secret: getSecret(), action: "update", id, data: updates })
+      });
+    } catch (error) {
+      console.error("[accountsService] Failed to update account.", error);
+    }
+  },
+
+    /** Re-hashes and stores a new password server-side after verifying the old one. */
+  async changePassword(id: string, currentPassword: string, newPassword: string): Promise<{ success: boolean; error?: string }> {
+    const url = getScriptUrl();
+    if (!url) {
+      // No backend configured — nothing real to verify against locally.
+      return { success: true };
+    }
+
+    try {
+      const response = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain" },
+        body: JSON.stringify({ secret: getSecret(), action: "changePassword", id, currentPassword, newPassword })
+      });
+      const data = await response.json();
+      if (data.error) return { success: false, error: data.error };
+      return { success: true };
+    } catch (error) {
+      console.error("[accountsService] Change password request failed.", error);
+      return { success: false, error: "Unable to reach the server. Please try again." };
+    }
+  }
+};
+

@@ -12,33 +12,51 @@ import { AdminModules } from "./Modules";
 import { AdminRMAccounts } from "./RMAccounts";
 import { AdminProfile } from "./Profile";
 import { AdminFAQ } from "./FAQ";
+import { accountsService, type Account } from "../../services/accountsService";
 import { type Commission } from "../../services/sheetsService";
 
-/**
- * Root component for the Admin domain. Handles authentication state and rendering the active screen.
- * @param {Object} props
- * @param {Function} props.onBack
- * @returns {JSX.Element}
- */
-export function AdminPortal({ 
-  onBack, 
-  commissions, 
-  onUpdate, 
-  isLoading 
-}: { 
-  onBack: () => void; 
-  commissions: Commission[]; 
-  onUpdate: (id: string, updates: Partial<Commission>) => Promise<void>; 
-  isLoading: boolean; 
+export function AdminPortal({
+  onBack,
+  commissions,
+  onUpdate,
+  isLoading
+}: {
+  onBack: () => void;
+  commissions: Commission[];
+  onUpdate: (id: string, updates: Partial<Commission>) => Promise<void>;
+  isLoading: boolean;
 }) {
   const [loggedIn, setLoggedIn] = useState(false);
   const [screen, setScreen] = useState("dashboard");
+  const [account, setAccount] = useState<Account | null>(null);
   const [email, setEmail] = useState("");
   const [pass, setPass] = useState("");
+  const [loginError, setLoginError] = useState("");
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
 
-  // TODO
-  const handleLogin = () => {
+  const handleLogin = async () => {
+    setLoginError("");
+    setIsLoggingIn(true);
+    const result = await accountsService.login(email, pass);
+    setIsLoggingIn(false);
+
+    if (!result.success || !result.user) {
+      setLoginError(result.error || "Login failed.");
+      return;
+    }
+    if (result.user.role !== "Admin") {
+      setLoginError("This account is not an Admin account.");
+      return;
+    }
+    setAccount(result.user);
     setLoggedIn(true);
+  };
+
+  const handleLogout = () => {
+    setLoggedIn(false);
+    setAccount(null);
+    setEmail("");
+    setPass("");
   };
 
   if (!loggedIn) {
@@ -50,14 +68,15 @@ export function AdminPortal({
               <Settings className="w-6 h-6 text-white" />
             </div>
             <h2 className="text-xl font-bold text-gray-900">Admin Portal</h2>
-            <p className="text-gray-400 text-sm mt-1">DLSU FabLab Management System</p>
+            <p className="text-gray-400 text-sm mt-1">Animo Labs FabLab Management System</p>
           </div>
           <div className="space-y-3 mb-5">
-            <Input label="Email Address" type="email" value={email} onChange={setEmail} placeholder="admin@dlsu.edu.ph" />
+            <Input label="Email Address" type="email" value={email} onChange={setEmail} placeholder="admin@animolabs.ph" />
             <Input label="Password" type="password" value={pass} onChange={setPass} placeholder="••••••••" />
           </div>
-          <button onClick={handleLogin} disabled={!email || !pass} className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white font-semibold py-2.5 rounded-xl transition">
-            Sign In
+          {loginError && <p className="text-red-500 text-sm mb-3">{loginError}</p>}
+          <button onClick={handleLogin} disabled={!email || !pass || isLoggingIn} className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white font-semibold py-2.5 rounded-xl transition">
+            {isLoggingIn ? "Signing In..." : "Sign In"}
           </button>
           <button onClick={onBack} className="w-full mt-3 text-gray-400 hover:text-gray-600 text-sm transition text-center">
             ← Back to Home
@@ -77,14 +96,14 @@ export function AdminPortal({
       case "announcements": return <AdminAnnouncements />;
       case "modules": return <AdminModules />;
       case "rm-accounts": return <AdminRMAccounts />;
-      case "profile": return <AdminProfile />;
+      case "profile": return <AdminProfile account={account!} onAccountUpdate={setAccount} />;
       case "faq": return <AdminFAQ />;
       default: return <AdminDashboard commissions={commissions} />;
     }
   };
 
   return (
-    <AdminLayout currentScreen={screen} setScreen={setScreen} onLogout={() => setLoggedIn(false)}>
+    <AdminLayout currentScreen={screen} setScreen={setScreen} onLogout={handleLogout}>
       {renderScreen()}
     </AdminLayout>
   );
