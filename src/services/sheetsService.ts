@@ -1,5 +1,17 @@
 import { COMMISSIONS as initialCommissions } from "../constants/mockData";
 
+export interface WeeklySchedule {
+  resident_ID: string;
+  Monday: string;
+  Tuesday: string;
+  Wednesday: string;
+  Thursday: string;
+  Friday: string;
+  Saturday?: string;
+  Sunday?: string;
+  [key: string]: string | undefined;
+}
+
 export interface Commission {
   id: string;
   client: string;
@@ -141,12 +153,14 @@ export const sheetsService = {
     }
 
     try {
-      await fetch(url, {
+      const secret = import.meta.env.VITE_WEBAPP_SECRET || "";
+      const fetchUrl = `${url}${url.includes("?") ? "&" : "?"}secret=${encodeURIComponent(secret)}&sheet=commission_reqs`;
+      await fetch(fetchUrl, {
         method: "POST",
         mode: "no-cors", // Crucial for cross-origin script redirects
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
         body: JSON.stringify({
-          secret: import.meta.env.VITE_WEBAPP_SECRET || "",
+          secret,
           sheet: "commission_reqs",
           action: "add",
           data: newCommission,
@@ -182,14 +196,15 @@ export const sheetsService = {
       }
       return;
     }
-
     try {
-      await fetch(url, {
+      const secret = import.meta.env.VITE_WEBAPP_SECRET || "";
+      const fetchUrl = `${url}${url.includes("?") ? "&" : "?"}secret=${encodeURIComponent(secret)}&sheet=commission_reqs`;
+      await fetch(fetchUrl, {
         method: "POST",
         mode: "no-cors",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
         body: JSON.stringify({
-          secret: import.meta.env.VITE_WEBAPP_SECRET || "",
+          secret,
           sheet: "commission_reqs",
           action: "update",
           id,
@@ -207,6 +222,134 @@ export const sheetsService = {
         data[idx] = { ...data[idx], ...updates };
         localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(data));
       }
+    }
+  },
+
+  /**
+   * Fetches all weekly schedules.
+   */
+  async fetchWeeklySchedules(): Promise<WeeklySchedule[]> {
+    const url = getScriptUrl();
+    if (!url) {
+      console.log(
+        "[sheetsService] No VITE_GOOGLE_SCRIPT_URL found. Using localStorage fallback for weekly schedules.",
+      );
+      const existing = localStorage.getItem("fablab_weekly_schedules_v1");
+      return existing ? JSON.parse(existing) : [];
+    }
+
+    try {
+      const secret = import.meta.env.VITE_WEBAPP_SECRET || "";
+      const fetchUrl = `${url}${url.includes("?") ? "&" : "?"}secret=${encodeURIComponent(secret)}&sheet=weeklyScheds`;
+      const response = await fetch(fetchUrl);
+      if (!response.ok)
+        throw new Error(`HTTP error! status: ${response.status}`);
+      const data = await response.json();
+      if (data.error) throw new Error(data.error);
+      return data as WeeklySchedule[];
+    } catch (error) {
+      console.error(
+        "[sheetsService] Failed to fetch weekly schedules from Google Sheets. Falling back to localStorage.",
+        error,
+      );
+      const existing = localStorage.getItem("fablab_weekly_schedules_v1");
+      return existing ? JSON.parse(existing) : [];
+    }
+  },
+
+  /**
+   * Saves a schedule for a single day.
+   */
+  async saveWeeklySchedule(
+    residentId: string,
+    day: string,
+    timeString: string,
+  ): Promise<void> {
+    const url = getScriptUrl();
+    const updates = { [day]: timeString };
+
+    if (!url) {
+      const existing = localStorage.getItem("fablab_weekly_schedules_v1");
+      const scheds: WeeklySchedule[] = existing ? JSON.parse(existing) : [];
+      const idx = scheds.findIndex((s) => s.resident_ID === residentId);
+      if (idx > -1) {
+        scheds[idx] = { ...scheds[idx], ...updates };
+      } else {
+        scheds.push({
+          resident_ID: residentId,
+          Monday: "",
+          Tuesday: "",
+          Wednesday: "",
+          Thursday: "",
+          Friday: "",
+          Saturday: "",
+          Sunday: "",
+          ...updates,
+        });
+      }
+      localStorage.setItem("fablab_weekly_schedules_v1", JSON.stringify(scheds));
+      return;
+    }
+    try {
+      const secret = import.meta.env.VITE_WEBAPP_SECRET || "";
+      const fetchUrl = `${url}${url.includes("?") ? "&" : "?"}secret=${encodeURIComponent(secret)}&sheet=weeklyScheds`;
+      await fetch(fetchUrl, {
+        method: "POST",
+        mode: "no-cors",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify({
+          secret,
+          sheet: "weeklyScheds",
+          action: "update",
+          id: residentId,
+          data: updates,
+        }),
+      });
+
+      // Also update local storage cache
+      const existing = localStorage.getItem("fablab_weekly_schedules_v1");
+      const scheds: WeeklySchedule[] = existing ? JSON.parse(existing) : [];
+      const idx = scheds.findIndex((s) => s.resident_ID === residentId);
+      if (idx > -1) {
+        scheds[idx] = { ...scheds[idx], ...updates };
+      } else {
+        scheds.push({
+          resident_ID: residentId,
+          Monday: "",
+          Tuesday: "",
+          Wednesday: "",
+          Thursday: "",
+          Friday: "",
+          Saturday: "",
+          Sunday: "",
+          ...updates,
+        });
+      }
+      localStorage.setItem("fablab_weekly_schedules_v1", JSON.stringify(scheds));
+    } catch (error) {
+      console.error(
+        "[sheetsService] Failed to save weekly schedule to Google Sheets. Saving to localStorage.",
+        error,
+      );
+      const existing = localStorage.getItem("fablab_weekly_schedules_v1");
+      const scheds: WeeklySchedule[] = existing ? JSON.parse(existing) : [];
+      const idx = scheds.findIndex((s) => s.resident_ID === residentId);
+      if (idx > -1) {
+        scheds[idx] = { ...scheds[idx], ...updates };
+      } else {
+        scheds.push({
+          resident_ID: residentId,
+          Monday: "",
+          Tuesday: "",
+          Wednesday: "",
+          Thursday: "",
+          Friday: "",
+          Saturday: "",
+          Sunday: "",
+          ...updates,
+        });
+      }
+      localStorage.setItem("fablab_weekly_schedules_v1", JSON.stringify(scheds));
     }
   },
 };

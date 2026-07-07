@@ -1,19 +1,40 @@
 import React, { useEffect, useState } from "react";
 import { Check } from "lucide-react";
 import { PageHeader, StatusBadge } from "../../components/common";
-import { accountsService, parseScheduleDays, type Account } from "../../services/accountsService";
+import { accountsService, type Account } from "../../services/accountsService";
+import { sheetsService, type WeeklySchedule } from "../../services/sheetsService";
+
+const dayMap: Record<string, string> = {
+  "Mon": "Monday",
+  "Tue": "Tuesday",
+  "Wed": "Wednesday",
+  "Thu": "Thursday",
+  "Fri": "Friday",
+  "Sat": "Saturday",
+  "Sun": "Sunday"
+};
 
 export function AdminRMSchedules() {
   const [makers, setMakers] = useState<Account[]>([]);
+  const [weeklyScheds, setWeeklyScheds] = useState<WeeklySchedule[]>([]);
   const [loading, setLoading] = useState(true);
-  const days = ["Mon","Tue","Wed","Thu","Fri"];
+  const days = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
 
   useEffect(() => {
     (async () => {
       setLoading(true);
-      const data = await accountsService.fetchResidentMakers();
-      setMakers(data);
-      setLoading(false);
+      try {
+        const [makersData, schedsData] = await Promise.all([
+          accountsService.fetchResidentMakers(),
+          sheetsService.fetchWeeklySchedules()
+        ]);
+        setMakers(makersData);
+        setWeeklyScheds(schedsData);
+      } catch (err) {
+        console.error("Error loading admin schedules data", err);
+      } finally {
+        setLoading(false);
+      }
     })();
   }, []);
 
@@ -24,34 +45,39 @@ export function AdminRMSchedules() {
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-muted border-b border-border">
-              {["Name","Program","Year","Mon","Tue","Wed","Thu","Fri","Hrs / Week","Total Hrs","Status"].map(h => (
+              {["Name","Program","Year","Mon","Tue","Wed","Thu","Fri","Sat","Sun","Hrs / Week","Total Hrs","Status"].map(h => (
                 <th key={h} className="text-left px-3 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">{h}</th>
               ))}
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={11} className="px-3 py-6 text-center text-muted-foreground text-sm">Loading...</td></tr>
+              <tr><td colSpan={13} className="px-3 py-6 text-center text-muted-foreground text-sm">Loading...</td></tr>
             ) : makers.length === 0 ? (
-              <tr><td colSpan={11} className="px-3 py-6 text-center text-muted-foreground text-sm">No Resident Makers yet.</td></tr>
+              <tr><td colSpan={13} className="px-3 py-6 text-center text-muted-foreground text-sm">No Resident Makers yet.</td></tr>
             ) : makers.map(rm => {
-              const scheduleDays = parseScheduleDays(rm.schedule);
+              const sched = weeklyScheds.find(s => s.resident_ID === rm.id);
               return (
                 <tr key={rm.id} className="border-b border-muted hover:bg-muted/50 transition">
                   <td className="px-3 py-3 font-semibold text-foreground whitespace-nowrap">{rm.firstName} {rm.lastName}</td>
                   <td className="px-3 py-3 text-muted-foreground text-xs">{rm.program || "—"}</td>
                   <td className="px-3 py-3 text-muted-foreground text-center font-mono">{rm.year || "—"}</td>
-                  {days.map(d => (
-                    <td key={d} className="px-3 py-3 text-center">
-                      {scheduleDays.includes(d) ? (
-                        <div className="w-6 h-6 rounded-md bg-emerald-500/20 flex items-center justify-center mx-auto">
-                          <Check className="w-3 h-3 text-emerald-500" />
-                        </div>
-                      ) : (
-                        <div className="w-6 h-6 rounded-md bg-muted mx-auto" />
-                      )}
-                    </td>
-                  ))}
+                  {days.map(d => {
+                    const fullDay = dayMap[d];
+                    const val = sched ? sched[fullDay] : "";
+                    const hasValue = val && val.trim() !== "";
+                    return (
+                      <td key={d} className="px-3 py-3 text-center">
+                        {hasValue ? (
+                          <div className="w-6 h-6 rounded-md bg-emerald-500/20 flex items-center justify-center mx-auto cursor-help" title={val}>
+                            <Check className="w-3 h-3 text-emerald-500" />
+                          </div>
+                        ) : (
+                          <div className="w-6 h-6 rounded-md bg-muted mx-auto" />
+                        )}
+                      </td>
+                    );
+                  })}
                   <td className="px-3 py-3 text-center font-mono font-semibold text-card-foreground">{Number(rm.hoursWeek) || 0}h</td>
                   <td className="px-3 py-3 text-center font-mono text-muted-foreground">{Number(rm.totalHours) || 0}h</td>
                   <td className="px-3 py-3"><StatusBadge status={rm.status} /></td>

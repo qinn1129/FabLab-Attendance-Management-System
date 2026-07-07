@@ -1,9 +1,19 @@
-import React, { useState } from "react";
-import { useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { Check, Pin, Youtube, Link2, ChevronDown } from "lucide-react";
 import { PageHeader } from "../../components/common";
 import { ANNOUNCEMENTS_DATA, MODULES_DATA, FAQS_DATA } from "../../constants/mockData";
-import { accountsService, parseScheduleDays, type Account } from "../../services/accountsService";
+import { accountsService, type Account } from "../../services/accountsService";
+import { sheetsService, type WeeklySchedule } from "../../services/sheetsService";
+
+const dayMap: Record<string, string> = {
+  "Mon": "Monday",
+  "Tue": "Tuesday",
+  "Wed": "Wednesday",
+  "Thu": "Thursday",
+  "Fri": "Friday",
+  "Sat": "Saturday",
+  "Sun": "Sunday"
+};
 
 /**
  * Global resources view for Resident Makers.
@@ -14,10 +24,12 @@ export function MakerResources() {
   const [tab, setTab] = useState<"schedule"|"announcements"|"modules"|"faq">("schedule");
   const [faqOpen, setFaqOpen] = useState<number | null>(null);
   const [makers, setMakers] = useState<Account[]>([]);
-  const days = ["Mon","Tue","Wed","Thu","Fri"];
+  const [weeklyScheds, setWeeklyScheds] = useState<WeeklySchedule[]>([]);
+  const days = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
 
   useEffect(() => {
     accountsService.fetchResidentMakers().then(setMakers);
+    sheetsService.fetchWeeklySchedules().then(setWeeklyScheds);
   }, []);
 
   return (
@@ -31,7 +43,6 @@ export function MakerResources() {
         ))}
       </div>
 
-      {/*Schedule*/}
       {tab === "schedule" && (
         <div className="bg-card rounded-xl border border-border overflow-hidden">
           <table className="w-full text-sm">
@@ -43,16 +54,27 @@ export function MakerResources() {
             </thead>
             <tbody>
               {makers.map(rm => {
-                const scheduleDays = parseScheduleDays(rm.schedule);
+                const sched = weeklyScheds.find(s => s.resident_ID === rm.id);
                 return (
-                 <tr key={rm.id} className="border-b border-muted hover:bg-muted/50 transition">
-                  <td className="px-4 py-3 font-medium text-foreground">{rm.firstName} {rm.lastName}</td>
-                   {days.map(d => (
-                     <td key={d} className="px-3 py-3 text-center">
-                      {scheduleDays.includes(d) ? <div className="w-5 h-5 rounded bg-emerald-500/20 mx-auto flex items-center justify-center"><Check className="w-3 h-3 text-emerald-500" /></div> : <div className="w-5 h-5 rounded bg-muted/50 mx-auto" />}
-                     </td>
-                   ))}
-                 </tr>
+                  <tr key={rm.id} className="border-b border-muted hover:bg-muted/50 transition">
+                    <td className="px-4 py-3 font-medium text-foreground">{rm.firstName} {rm.lastName}</td>
+                    {days.map(d => {
+                      const fullDay = dayMap[d];
+                      const val = sched ? sched[fullDay] : "";
+                      const hasValue = val && val.trim() !== "";
+                      return (
+                        <td key={d} className="px-3 py-3 text-center">
+                          {hasValue ? (
+                            <div className="w-5 h-5 rounded bg-emerald-500/20 mx-auto flex items-center justify-center cursor-help" title={val}>
+                              <Check className="w-3 h-3 text-emerald-500" />
+                            </div>
+                          ) : (
+                            <div className="w-5 h-5 rounded bg-muted/50 mx-auto" />
+                          )}
+                        </td>
+                      );
+                    })}
+                  </tr>
                 );
               })}
             </tbody>
