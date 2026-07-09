@@ -457,6 +457,13 @@ export function ClientPortal({
                   <p className="text-violet-900/80 mt-1">
                     Please refer to your <span className="font-semibold">registered email</span> for updates, quotation, and next steps.
                   </p>
+                  <p className="text-violet-900/80 mt-2">
+                    Need help? Contact support at{" "}
+                    <a href="mailto:domie.jucutan@dlsu.edu.ph" className="font-semibold underline">
+                      domie.jucutan@dlsu.edu.ph
+                    </a>
+                    .
+                  </p>
                 </div>
 
                 <div className="mb-8 p-5 bg-blue-50 text-blue-800 rounded-2xl border border-blue-100 text-xs text-left space-y-3">
