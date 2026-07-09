@@ -35,7 +35,7 @@ export function ClientPortal({
     isDlsuStudent: true,
     idNumber: "", program: "", college: "CCS", department: "",
     service: "", purpose: "Academic / Thesis", purposeOther: "",
-    color: "Black", colorOther: "", filament: "PLA", urgency: "Standard (3-5 days)", notes: "",
+    color: "Black", colorOther: "", filament: "PLA", expectedPickupDate: "Standard (3-5 days)", notes: "",
     pickupOption: "Animo Labs FabLab JGIC",
     weight: 200
   });
@@ -168,7 +168,7 @@ export function ClientPortal({
         color: form.color,
         colorOther: form.colorOther,
         filament: form.filament,
-        urgency: form.urgency,
+        expectedPickupDate: form.expectedPickupDate,
         pickupOption: form.pickupOption,
         weight: form.weight,
         notes: form.notes,
@@ -469,7 +469,13 @@ export function ClientPortal({
                     error={colorOtherError}
                   />
                 )}
-                <Select label="Urgency" value={form.urgency} onChange={v => setForm({ ...form, urgency: v })} options={["Standard (3-5 days)", "Rush (1-2 days)", "No rush"]} />
+                <Input
+                  label="Expected Pickup Date"
+                  type="date"
+                  value={form.expectedPickupDate}
+                  onChange={v => setForm({ ...form, expectedPickupDate: v })}
+                  placeholder=""
+                />
 
                 <Select
                   label="Pickup Option"
@@ -555,7 +561,7 @@ export function ClientPortal({
                     <div><p className="text-gray-500 text-xs mb-1">Material</p><p className="font-semibold text-gray-900">{form.color} {form.filament}</p></div>
                     <div><p className="text-gray-500 text-xs mb-1">Weight</p><p className="font-semibold text-gray-900">{form.weight} g</p></div>
                     <div><p className="text-gray-500 text-xs mb-1">Uploaded File</p><p className="font-semibold text-gray-900">{fileName || "None (Design Needed)"}</p></div>
-                    <div><p className="text-gray-500 text-xs mb-1">Urgency</p><p className="font-semibold text-gray-900">{form.urgency || "—"}</p></div>
+                    <div><p className="text-gray-500 text-xs mb-1">Expected Pickup Date</p><p className="font-semibold text-gray-900">{form.expectedPickupDate || "—"}</p></div>
                     <div><p className="text-gray-500 text-xs mb-1">Pickup Option</p><p className="font-semibold text-gray-900">{form.pickupOption || "—"}</p></div>
                   </div>
                   {form.notes && (

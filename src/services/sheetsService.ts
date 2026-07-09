@@ -30,7 +30,8 @@ export interface Commission {
   color: string;
   colorOther?: string;
   filament: string;
-  urgency: string;
+  urgency?: string;
+  expectedPickupDate?: string;
   pickupOption?: string;
   weight: number;
   notes: string;
@@ -82,6 +83,7 @@ const seedLocalStorage = (): Commission[] => {
     colorOther: "",
     filament: c.filament,
     urgency: "Standard (3-5 days)",
+    expectedPickupDate: "",
     pickupOption: "Animo Labs FabLab JGIC",
     weight: 150,
     notes: "Preseeded mock commission data.",
