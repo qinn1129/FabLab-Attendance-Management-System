@@ -87,7 +87,7 @@ export function ClientPortal({
     }
     if (step === 3) {
       if (form.weight <= 0 || form.weight > 1000) return false;
-      if (form.service === "3D Printing W/File" && !fileName) return false;
+      if (form.service === "3D Printing With File" && !fileName) return false;
       return true;
     }
     return true;
@@ -336,7 +336,7 @@ export function ClientPortal({
               <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
                 <h3 className="text-lg font-bold text-gray-900 mb-4">Service Selection</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                  {["3D Printing W/File", "3D Printing W/O File (Modelling Needed)", "Modelling Only", "Customized Keychains", "NFC Keychains"].map(s => (
+                  {["3D Printing With File", "3D Printing Without File (Modelling Needed)", "Modelling Only", "Customized Keychains", "NFC Keychains"].map(s => (
                     <button
                       key={s}
                       onClick={() => setForm({ ...form, service: s })}
@@ -395,7 +395,7 @@ export function ClientPortal({
                   <p className="text-xs text-gray-500 mt-1">
                     {fileName ? "Click to upload a different mock file" : "Click to select a simulated mock file"}
                   </p>
-                  {form.service === "3D Printing W/File" && !fileName && (
+                  {form.service === "3D Printing With File" && !fileName && (
                     <p className="text-xs text-red-500 font-medium mt-1 animate-pulse">
                       * Uploading a file is required for this service.
                     </p>
