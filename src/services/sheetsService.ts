@@ -36,6 +36,7 @@ export interface Commission {
   weight: number;
   notes: string;
   file: string;
+  driveLink?: string;
   submitted: string;
   rm: string | null;
   printer: string | null;
@@ -88,6 +89,7 @@ const seedLocalStorage = (): Commission[] => {
     weight: 150,
     notes: "Preseeded mock commission data.",
     file: c.file === "Has File" ? "model_file.stl" : "",
+    driveLink: "",
     submitted: c.submitted,
     rm: c.rm,
     printer: c.printer,

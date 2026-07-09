@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { ArrowLeft, ArrowRight, CheckCircle, Upload, AlertTriangle, Mail } from "lucide-react";
+import { ArrowLeft, ArrowRight, CheckCircle, AlertTriangle, Mail } from "lucide-react";
 import { HeroSection } from "../../components/client/HeroSection";
 import { ServicesSection } from "../../components/client/ServicesSection";
 import { WorkshopsSection } from "../../components/client/WorkshopsSection";
@@ -37,9 +37,9 @@ export function ClientPortal({
     service: "", purpose: "Academic / Thesis", purposeOther: "",
     color: "Black", colorOther: "", filament: "PLA", expectedPickupDate: "Standard (3-5 days)", notes: "",
     pickupOption: "Animo Labs FabLab JGIC",
+    driveLink: "",
     weight: 200
   });
-  const [fileName, setFileName] = useState("");
   const [mockLogs, setMockLogs] = useState<string[]>([]);
 
   // Capacity validation
@@ -83,6 +83,11 @@ export function ClientPortal({
     ? "Please specify your preferred color."
     : "";
 
+  const needsDriveLink = form.service === "3D Printing With File";
+  const driveLinkError = needsDriveLink && !form.driveLink.trim()
+    ? "A Google Drive link is required for this service."
+    : "";
+
   // Step validation check
   const isStepValid = () => {
     if (step === 1) {
@@ -108,8 +113,8 @@ export function ClientPortal({
     }
     if (step === 3) {
       if (form.weight <= 0 || form.weight > 1000) return false;
-      if (form.service === "3D Printing With File" && !fileName) return false;
       if (colorOtherError) return false;
+      if (driveLinkError) return false;
       if (!form.pickupOption) return false;
       return true;
     }
@@ -172,7 +177,8 @@ export function ClientPortal({
         pickupOption: form.pickupOption,
         weight: form.weight,
         notes: form.notes,
-        file: fileName || "None (Design Needed)",
+        file: "N/A (Drive link provided)",
+        driveLink: form.driveLink,
         submitted: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" })
       };
 
@@ -507,27 +513,17 @@ export function ClientPortal({
                   <textarea value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} rows={3} placeholder="Dimensions, infill percentage, specific instructions..." className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm text-gray-900 bg-white outline-none focus:ring-2 focus:ring-violet-400 resize-none" />
                 </div>
 
-                <div
-                  onClick={() => {
-                    const mockFiles = ["robotic_chassis.stl", "gears_v3.stl", "phone_stand_model.obj", "fablab_keychain.stl"];
-                    const randomFile = mockFiles[Math.floor(Math.random() * mockFiles.length)];
-                    setFileName(randomFile);
-                  }}
-                  className="mt-4 p-5 border-2 border-dashed border-gray-200 rounded-xl flex flex-col items-center justify-center text-center hover:bg-gray-50 transition cursor-pointer"
-                >
-                  <Upload className="w-6 h-6 text-violet-400 mb-2" />
-                  <p className="text-sm font-medium text-gray-900">
-                    {fileName ? `Uploaded: ${fileName}` : "Upload STL/OBJ files"}
-                  </p>
-                  <p className="text-xs text-gray-500 mt-1">
-                    {fileName ? "Click to upload a different mock file" : "Click to select a simulated mock file"}
-                  </p>
-                  {form.service === "3D Printing With File" && !fileName && (
-                    <p className="text-xs text-red-500 font-medium mt-1 animate-pulse">
-                      * Uploading a file is required for this service.
-                    </p>
-                  )}
-                </div>
+                <Input
+                  label="Google Drive Link (file upload link)"
+                  value={form.driveLink}
+                  onChange={v => setForm({ ...form, driveLink: v })}
+                  placeholder="https://drive.google.com/drive/folders/..."
+                  required={needsDriveLink}
+                  error={driveLinkError}
+                />
+                <p className="text-xs text-gray-500">
+                  Please ensure sharing is set to “Anyone with the link can view”.
+                </p>
               </div>
             )}
 
@@ -560,7 +556,7 @@ export function ClientPortal({
                     <div><p className="text-gray-500 text-xs mb-1">Purpose</p><p className="font-semibold text-gray-900">{form.purpose === "Others" ? (form.purposeOther || "—") : (form.purpose || "—")}</p></div>
                     <div><p className="text-gray-500 text-xs mb-1">Material</p><p className="font-semibold text-gray-900">{form.color} {form.filament}</p></div>
                     <div><p className="text-gray-500 text-xs mb-1">Weight</p><p className="font-semibold text-gray-900">{form.weight} g</p></div>
-                    <div><p className="text-gray-500 text-xs mb-1">Uploaded File</p><p className="font-semibold text-gray-900">{fileName || "None (Design Needed)"}</p></div>
+                    <div className="col-span-2"><p className="text-gray-500 text-xs mb-1">Google Drive Link</p><p className="font-semibold text-gray-900 break-all">{form.driveLink || "—"}</p></div>
                     <div><p className="text-gray-500 text-xs mb-1">Expected Pickup Date</p><p className="font-semibold text-gray-900">{form.expectedPickupDate || "—"}</p></div>
                     <div><p className="text-gray-500 text-xs mb-1">Pickup Option</p><p className="font-semibold text-gray-900">{form.pickupOption || "—"}</p></div>
                   </div>
@@ -606,7 +602,7 @@ export function ClientPortal({
                   </div>
                 </div>
 
-                <button onClick={() => { setStep(0); setFileName(""); }} className="bg-gray-900 hover:bg-gray-800 text-white font-semibold px-6 py-3 rounded-xl transition">
+                <button onClick={() => { setStep(0); }} className="bg-gray-900 hover:bg-gray-800 text-white font-semibold px-6 py-3 rounded-xl transition">
                   Return to Home
                 </button>
               </div>
