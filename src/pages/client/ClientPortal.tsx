@@ -96,7 +96,17 @@ export function ClientPortal({
   const handleSubmit = async () => {
     setIsSubmitting(true);
     try {
-      const nextIdNum = commissions.length + 1;
+      // Find the highest current numeric ID to avoid duplicates if rows are filtered or deleted
+      let maxIdNum = 0;
+      commissions.forEach(c => {
+        if (c.id && c.id.startsWith("COM-")) {
+          const num = parseInt(c.id.substring(4), 10);
+          if (!isNaN(num) && num > maxIdNum) {
+            maxIdNum = num;
+          }
+        }
+      });
+      const nextIdNum = maxIdNum + 1;
       const nextId = `COM-${nextIdNum.toString().padStart(3, "0")}`;
 
       const newCommission = {
