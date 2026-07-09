@@ -30,9 +30,11 @@ export function ClientPortal({
 
   const [form, setForm] = useState({
     name: "", email: "", clientType: "Student",
+    affiliation: "",
+    isDlsuStudent: true,
     idNumber: "", program: "", college: "CCS", department: "",
-    service: "", purpose: "Academic / Thesis",
-    color: "Black", filament: "PLA", urgency: "Standard (3-5 days)", notes: "",
+    service: "", purpose: "Academic / Thesis", purposeOther: "",
+    color: "Black", colorOther: "", filament: "PLA", urgency: "Standard (3-5 days)", notes: "",
     weight: 200
   });
   const [fileName, setFileName] = useState("");
@@ -66,12 +68,21 @@ export function ClientPortal({
     ? "ID number must be exactly 8 digits."
     : "";
 
+  const purposeOtherError = form.purpose === "Others" && !form.purposeOther.trim()
+    ? "Please specify your purpose."
+    : "";
+
+  const colorOtherError = form.color === "Other" && !form.colorOther.trim()
+    ? "Please specify your preferred color."
+    : "";
+
   // Step validation check
   const isStepValid = () => {
     if (step === 1) {
       if (isUserLimitReached) return false;
       if (!form.name.trim() || !form.email.trim()) return false;
       if (emailError) return false;
+      if ((form.clientType === "Outsider" || !form.isDlsuStudent) && !form.affiliation.trim()) return false;
       if (form.clientType === "Student") {
         if (!form.idNumber.trim() || !form.program.trim()) return false;
         if (idError) return false;
@@ -83,11 +94,14 @@ export function ClientPortal({
       return true;
     }
     if (step === 2) {
-      return !!form.service;
+      if (!form.service) return false;
+      if (purposeOtherError) return false;
+      return true;
     }
     if (step === 3) {
       if (form.weight <= 0 || form.weight > 1000) return false;
       if (form.service === "3D Printing With File" && !fileName) return false;
+      if (colorOtherError) return false;
       return true;
     }
     return true;
@@ -132,13 +146,17 @@ export function ClientPortal({
         client: form.name,
         clientEmail: form.email,
         clientType: form.clientType,
+        affiliation: form.affiliation,
+        isDlsuStudent: form.isDlsuStudent,
         idNumber: form.idNumber,
         program: form.program,
         college: form.college,
         department: form.department,
         service: form.service,
         purpose: form.purpose,
+        purposeOther: form.purposeOther,
         color: form.color,
+        colorOther: form.colorOther,
         filament: form.filament,
         urgency: form.urgency,
         weight: form.weight,
@@ -305,8 +323,46 @@ export function ClientPortal({
                     required
                     error={emailError}
                   />
-                  <Select label="Client Type" value={form.clientType} onChange={v => setForm({ ...form, clientType: v })} options={["Student", "Faculty", "Outsider"]} />
+                  <Select
+                    label="Client Type"
+                    value={form.clientType}
+                    onChange={v =>
+                      setForm({
+                        ...form,
+                        clientType: v,
+                        // Outsiders shouldn't see the DLSU checkbox; treat them as non-DLSU.
+                        isDlsuStudent: v === "Outsider" ? false : form.isDlsuStudent,
+                      })
+                    }
+                    options={["Student", "Faculty", "Outsider"]}
+                  />
                 </div>
+
+                {form.clientType !== "Outsider" && (
+                  <label className="flex items-center gap-2 select-none cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={form.isDlsuStudent}
+                      onChange={e => setForm({ ...form, isDlsuStudent: e.target.checked })}
+                      className="w-4 h-4 rounded border-gray-300 text-violet-600 focus:ring-violet-400"
+                    />
+                    <span className="text-sm text-gray-700">
+                      I am from De La Salle University (DLSU)
+                    </span>
+                  </label>
+                )}
+
+                {(form.clientType === "Outsider" || !form.isDlsuStudent) && (
+                  <div className="animate-in fade-in duration-200">
+                    <Input
+                      label="Affiliation"
+                      value={form.affiliation}
+                      onChange={v => setForm({ ...form, affiliation: v })}
+                      placeholder="e.g. Company / School / Organization"
+                      required
+                    />
+                  </div>
+                )}
 
                 {form.clientType === "Student" && (
                   <div className="grid grid-cols-3 gap-4 animate-in fade-in duration-200">
@@ -347,7 +403,22 @@ export function ClientPortal({
                     </button>
                   ))}
                 </div>
-                <Select label="Purpose of Commission" value={form.purpose} onChange={v => setForm({ ...form, purpose: v })} options={["Academic / Thesis", "Personal Project", "Organization Event", "Research"]} />
+                <Select
+                  label="Purpose of Commission"
+                  value={form.purpose}
+                  onChange={v => setForm({ ...form, purpose: v })}
+                  options={["Academic / Thesis", "Personal Project", "Organization Event", "Research", "Others"]}
+                />
+                {form.purpose === "Others" && (
+                  <Input
+                    label="Specify Purpose"
+                    value={form.purposeOther}
+                    onChange={v => setForm({ ...form, purposeOther: v })}
+                    placeholder="Type your purpose"
+                    required
+                    error={purposeOtherError}
+                  />
+                )}
               </div>
             )}
 
@@ -356,9 +427,29 @@ export function ClientPortal({
               <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
                 <h3 className="text-lg font-bold text-gray-900 mb-4">Commission Details</h3>
                 <div className="grid grid-cols-2 gap-4">
-                  <Select label="Preferred Color" value={form.color} onChange={v => setForm({ ...form, color: v })} options={["Black", "White", "Gray", "Red", "Blue", "Green", "Custom"]} />
-                  <Select label="Filament / Material" value={form.filament} onChange={v => setForm({ ...form, filament: v })} options={["PLA", "ABS", "PETG", "TPU", "Not Sure"]} />
+                  <Select
+                    label="Preferred Color"
+                    value={form.color}
+                    onChange={v => setForm({ ...form, color: v })}
+                    options={["Black", "White", "Gray", "Red", "Blue", "Green", "Multicolor", "Other"]}
+                  />
+                  <Select
+                    label="Filament / Material"
+                    value={form.filament}
+                    onChange={v => setForm({ ...form, filament: v })}
+                    options={["PLA", "ABS", "PETG", "TPU", "ASA", "Not Sure"]}
+                  />
                 </div>
+                {form.color === "Other" && (
+                  <Input
+                    label="Specify Color"
+                    value={form.colorOther}
+                    onChange={v => setForm({ ...form, colorOther: v })}
+                    placeholder="e.g. Gold"
+                    required
+                    error={colorOtherError}
+                  />
+                )}
                 <Select label="Urgency" value={form.urgency} onChange={v => setForm({ ...form, urgency: v })} options={["Standard (3-5 days)", "Rush (1-2 days)", "No rush"]} />
 
                 <Input
@@ -412,6 +503,13 @@ export function ClientPortal({
                   <div className="grid grid-cols-2 gap-4 text-sm">
                     <div><p className="text-gray-500 text-xs mb-1">Name</p><p className="font-semibold text-gray-900">{form.name || "—"}</p></div>
                     <div><p className="text-gray-500 text-xs mb-1">Client Type</p><p className="font-semibold text-gray-900">{form.clientType || "—"}</p></div>
+                    <div><p className="text-gray-500 text-xs mb-1">DLSU Client</p><p className="font-semibold text-gray-900">{form.isDlsuStudent ? "Yes" : "No"}</p></div>
+                    {(form.clientType === "Outsider" || !form.isDlsuStudent) && (
+                      <div>
+                        <p className="text-gray-500 text-xs mb-1">Affiliation</p>
+                        <p className="font-semibold text-gray-900">{form.affiliation || "—"}</p>
+                      </div>
+                    )}
                     {form.clientType === "Student" && (
                       <>
                         <div><p className="text-gray-500 text-xs mb-1">ID Number</p><p className="font-semibold text-gray-900">{form.idNumber || "—"}</p></div>
@@ -422,7 +520,7 @@ export function ClientPortal({
                       <div><p className="text-gray-500 text-xs mb-1">Department</p><p className="font-semibold text-gray-900">{form.department || "—"}</p></div>
                     )}
                     <div><p className="text-gray-500 text-xs mb-1">Service</p><p className="font-semibold text-gray-900">{form.service || "—"}</p></div>
-                    <div><p className="text-gray-500 text-xs mb-1">Purpose</p><p className="font-semibold text-gray-900">{form.purpose || "—"}</p></div>
+                    <div><p className="text-gray-500 text-xs mb-1">Purpose</p><p className="font-semibold text-gray-900">{form.purpose === "Others" ? (form.purposeOther || "—") : (form.purpose || "—")}</p></div>
                     <div><p className="text-gray-500 text-xs mb-1">Material</p><p className="font-semibold text-gray-900">{form.color} {form.filament}</p></div>
                     <div><p className="text-gray-500 text-xs mb-1">Weight</p><p className="font-semibold text-gray-900">{form.weight} g</p></div>
                     <div><p className="text-gray-500 text-xs mb-1">Uploaded File</p><p className="font-semibold text-gray-900">{fileName || "None (Design Needed)"}</p></div>

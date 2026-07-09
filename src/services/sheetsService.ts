@@ -17,13 +17,17 @@ export interface Commission {
   client: string;
   clientEmail: string;
   clientType: string;
+  affiliation?: string;
+  isDlsuStudent?: boolean;
   idNumber: string;
   program: string;
   college: string;
   department: string;
   service: string;
   purpose: string;
+  purposeOther?: string;
   color: string;
+  colorOther?: string;
   filament: string;
   urgency: string;
   weight: number;
@@ -62,13 +66,17 @@ const seedLocalStorage = (): Commission[] => {
     client: c.client,
     clientEmail: `${c.client.toLowerCase().replace(/\s+/g, ".")}@dlsu.edu.ph`,
     clientType: "Student",
+    affiliation: "",
+    isDlsuStudent: true,
     idNumber: `120${(10000 + i).toString()}`,
     program: "BSCS-ST",
     college: "CCS",
     department: "",
     service: c.service + (c.file === "Has File" ? " W/File" : ""),
     purpose: "Academic / Thesis",
+    purposeOther: "",
     color: c.color,
+    colorOther: "",
     filament: c.filament,
     urgency: "Standard (3-5 days)",
     weight: 150,
