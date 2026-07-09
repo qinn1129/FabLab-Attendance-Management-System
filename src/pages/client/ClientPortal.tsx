@@ -6,7 +6,7 @@ import { WorkshopsSection } from "../../components/client/WorkshopsSection";
 import { TestimonialsSection } from "../../components/client/TestimonialsSection";
 import { ProgressBar } from "../../components/client/ProgressBar";
 import { Input, Select } from "../../components/common";
-import { type Commission } from "../../services/sheetsService";
+import { sheetsService, type Commission } from "../../services/sheetsService";
 
 /**
  * Root component for the Client domain. Handles the landing page and the multi-step commission request form.
@@ -14,16 +14,16 @@ import { type Commission } from "../../services/sheetsService";
  * @param {Function} props.onBack 
  * @returns {JSX.Element} 
  */
-export function ClientPortal({ 
-  onBack, 
-  commissions, 
-  onAdd, 
-  isLoading 
-}: { 
-  onBack: () => void; 
-  commissions: Commission[]; 
-  onAdd: (newCom: Omit<Commission, "rm" | "printer" | "status" | "deadline" | "problems">) => Promise<void>; 
-  isLoading: boolean; 
+export function ClientPortal({
+  onBack,
+  commissions,
+  onAdd,
+  isLoading
+}: {
+  onBack: () => void;
+  commissions: Commission[];
+  onAdd: (newCom: Omit<Commission, "rm" | "printer" | "status" | "deadline" | "problems">) => Promise<void>;
+  isLoading: boolean;
 }) {
   const [step, setStep] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -45,9 +45,9 @@ export function ClientPortal({
 
   // Client validation
   const userActiveCount = commissions.filter(
-    c => c.clientEmail?.toLowerCase() === form.email.trim().toLowerCase() && 
-         c.status !== "Completed" && 
-         c.status !== "Rejected"
+    c => c.clientEmail?.toLowerCase() === form.email.trim().toLowerCase() &&
+      c.status !== "Completed" &&
+      c.status !== "Rejected"
   ).length;
   const isUserLimitReached = userActiveCount >= 3;
 
@@ -96,9 +96,25 @@ export function ClientPortal({
   const handleSubmit = async () => {
     setIsSubmitting(true);
     try {
+      // Fetch the latest commissions directly from Google Sheets/localStorage fallback first
+      const currentCommissions = await sheetsService.fetchCommissions();
+
+      // Double check active limit against the freshest sheets data
+      const activeCountForUser = currentCommissions.filter(
+        c => c.clientEmail?.toLowerCase() === form.email.trim().toLowerCase() &&
+          c.status !== "Completed" &&
+          c.status !== "Rejected"
+      ).length;
+
+      if (activeCountForUser >= 3) {
+        alert("Submission failed: You already have 3 active commissions in progress.");
+        setIsSubmitting(false);
+        return;
+      }
+
       // Find the highest current numeric ID to avoid duplicates if rows are filtered or deleted
       let maxIdNum = 0;
-      commissions.forEach(c => {
+      currentCommissions.forEach(c => {
         if (c.id && c.id.startsWith("COM-")) {
           const num = parseInt(c.id.substring(4), 10);
           if (!isNaN(num) && num > maxIdNum) {
@@ -106,6 +122,8 @@ export function ClientPortal({
           }
         }
       });
+
+      console.log(maxIdNum);
       const nextIdNum = maxIdNum + 1;
       const nextId = `COM-${nextIdNum.toString().padStart(3, "0")}`;
 
@@ -156,7 +174,7 @@ export function ClientPortal({
           </div>
           {!import.meta.env.VITE_GOOGLE_SCRIPT_URL && (
             <div className="flex gap-3">
-              <button 
+              <button
                 onClick={() => {
                   localStorage.setItem("fablab_commissions_v2", JSON.stringify([]));
                   window.location.reload();
@@ -165,7 +183,7 @@ export function ClientPortal({
               >
                 Clear Database (Simulate Empty Sheet)
               </button>
-              <button 
+              <button
                 onClick={() => {
                   localStorage.removeItem("fablab_commissions_v2");
                   window.location.reload();
@@ -215,7 +233,7 @@ export function ClientPortal({
           </div>
           <h3 className="text-xl font-bold text-gray-900 mb-2">FabLab is Full</h3>
           <p className="text-gray-600 text-sm mb-6 leading-relaxed">
-            Sorry! The FabLab is currently at full capacity handling the maximum of 3 concurrent active commissions. 
+            Sorry! The FabLab is currently at full capacity handling the maximum of 3 concurrent active commissions.
             New submissions are temporarily paused.
           </p>
           <div className="p-4 bg-gray-50 rounded-xl border border-gray-200 text-xs text-gray-500 text-left mb-6 space-y-1">
@@ -223,8 +241,8 @@ export function ClientPortal({
             <p>1. Try again later once current commissions are completed.</p>
             <p>2. For bulk/partner requests, contact <strong className="text-gray-700">Domie James Jucutan</strong> at <a href="mailto:hello@animolabs.ph" className="text-violet-600 underline">hello@animolabs.ph</a>.</p>
           </div>
-          <button 
-            onClick={() => setStep(0)} 
+          <button
+            onClick={() => setStep(0)}
             className="w-full bg-gray-900 hover:bg-gray-800 text-white font-semibold py-3 rounded-xl transition"
           >
             Return to Home
@@ -262,15 +280,15 @@ export function ClientPortal({
             {step === 1 && (
               <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
                 <h3 className="text-lg font-bold text-gray-900 mb-4">Personal Details</h3>
-                
+
                 {isUserLimitReached && (
                   <div className="p-4 bg-red-50 text-red-800 border border-red-200 rounded-xl text-xs space-y-1.5 animate-in fade-in duration-300">
                     <p className="font-bold text-red-900 flex items-center gap-1">
                       <AlertTriangle className="w-4 h-4" /> Maximum Commissions Reached
                     </p>
                     <p>
-                      You currently have {userActiveCount} active commissions in progress. 
-                      The FabLab restricts clients to a maximum of 3 concurrent active commissions. 
+                      You currently have {userActiveCount} active commissions in progress.
+                      The FabLab restricts clients to a maximum of 3 concurrent active commissions.
                       Please message <strong>Domie James Jucutan</strong> or email <a href="mailto:hello@animolabs.ph" className="underline font-bold text-red-950">hello@animolabs.ph</a> to manage your active slots.
                     </p>
                   </div>
@@ -278,33 +296,33 @@ export function ClientPortal({
 
                 <Input label="Full Name" value={form.name} onChange={v => setForm({ ...form, name: v })} placeholder="Juan dela Cruz" required />
                 <div className="grid grid-cols-2 gap-4">
-                  <Input 
-                    label="Email Address" 
-                    type="email" 
-                    value={form.email} 
-                    onChange={v => setForm({ ...form, email: v })} 
-                    placeholder="name@dlsu.edu.ph" 
-                    required 
-                    error={emailError} 
+                  <Input
+                    label="Email Address"
+                    type="email"
+                    value={form.email}
+                    onChange={v => setForm({ ...form, email: v })}
+                    placeholder="name@dlsu.edu.ph"
+                    required
+                    error={emailError}
                   />
                   <Select label="Client Type" value={form.clientType} onChange={v => setForm({ ...form, clientType: v })} options={["Student", "Faculty", "Outsider"]} />
                 </div>
-                
+
                 {form.clientType === "Student" && (
                   <div className="grid grid-cols-3 gap-4 animate-in fade-in duration-200">
-                    <Input 
-                      label="ID Number" 
-                      value={form.idNumber} 
-                      onChange={v => setForm({ ...form, idNumber: v })} 
-                      placeholder="e.g. 12012345" 
-                      required 
-                      error={idError} 
+                    <Input
+                      label="ID Number"
+                      value={form.idNumber}
+                      onChange={v => setForm({ ...form, idNumber: v })}
+                      placeholder="e.g. 12012345"
+                      required
+                      error={idError}
                     />
                     <Input label="Program" value={form.program} onChange={v => setForm({ ...form, program: v })} placeholder="e.g. BSCS-ST" required />
                     <Select label="College" value={form.college} onChange={v => setForm({ ...form, college: v })} options={["CCS", "GCOE", "CLA", "COS", "RVRCOB", "BAGCED", "SOE"]} />
                   </div>
                 )}
-                
+
                 {form.clientType === "Faculty" && (
                   <div className="grid grid-cols-1 gap-4 animate-in fade-in duration-200">
                     <Input label="Department" value={form.department} onChange={v => setForm({ ...form, department: v })} placeholder="e.g. Software Technology" required />
@@ -342,8 +360,8 @@ export function ClientPortal({
                   <Select label="Filament / Material" value={form.filament} onChange={v => setForm({ ...form, filament: v })} options={["PLA", "ABS", "PETG", "TPU", "Not Sure"]} />
                 </div>
                 <Select label="Urgency" value={form.urgency} onChange={v => setForm({ ...form, urgency: v })} options={["Standard (3-5 days)", "Rush (1-2 days)", "No rush"]} />
-                
-                <Input 
+
+                <Input
                   label="Estimated Weight (grams)"
                   type="number"
                   value={form.weight.toString()}
@@ -362,7 +380,7 @@ export function ClientPortal({
                   <textarea value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} rows={3} placeholder="Dimensions, infill percentage, specific instructions..." className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm text-gray-900 bg-white outline-none focus:ring-2 focus:ring-violet-400 resize-none" />
                 </div>
 
-                <div 
+                <div
                   onClick={() => {
                     const mockFiles = ["robotic_chassis.stl", "gears_v3.stl", "phone_stand_model.obj", "fablab_keychain.stl"];
                     const randomFile = mockFiles[Math.floor(Math.random() * mockFiles.length)];
@@ -433,7 +451,7 @@ export function ClientPortal({
                 <p className="text-gray-500 mb-6 max-w-md mx-auto">
                   Your commission request has been sent to our Resident Makers.
                 </p>
-                
+
                 <div className="mb-8 p-5 bg-blue-50 text-blue-800 rounded-2xl border border-blue-100 text-xs text-left space-y-3">
                   <p className="font-bold text-sm text-blue-900 flex items-center gap-1.5">
                     <Mail className="w-4 h-4" /> System Dispatch Notification (Mock Logs)
@@ -451,7 +469,7 @@ export function ClientPortal({
                     <p>📧 Contact <strong className="text-blue-950">domie.jucutan@dlsu.edu.ph</strong> or <strong className="text-blue-950">hello@animolabs.ph</strong> for additional concerns.</p>
                   </div>
                 </div>
-                
+
                 <button onClick={() => { setStep(0); setFileName(""); }} className="bg-gray-900 hover:bg-gray-800 text-white font-semibold px-6 py-3 rounded-xl transition">
                   Return to Home
                 </button>
@@ -461,24 +479,24 @@ export function ClientPortal({
 
           {step > 0 && step < 5 && (
             <div className="mt-8 pt-6 border-t border-gray-100 flex items-center justify-between">
-              <button 
-                onClick={() => setStep(s => s - 1)} 
-                className="text-gray-500 hover:text-gray-900 font-medium px-4 py-2 rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed" 
+              <button
+                onClick={() => setStep(s => s - 1)}
+                className="text-gray-500 hover:text-gray-900 font-medium px-4 py-2 rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
                 disabled={step === 1 || isSubmitting}
               >
                 Back
               </button>
               {step < 4 ? (
-                <button 
-                  onClick={() => setStep(s => s + 1)} 
+                <button
+                  onClick={() => setStep(s => s + 1)}
                   disabled={!isStepValid()}
                   className="bg-violet-600 hover:bg-violet-700 text-white font-semibold px-6 py-2.5 rounded-xl transition flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Next Step <ArrowRight className="w-4 h-4" />
                 </button>
               ) : (
-                <button 
-                  onClick={handleSubmit} 
+                <button
+                  onClick={handleSubmit}
                   disabled={!isStepValid() || isSubmitting}
                   className="bg-green-600 hover:bg-green-700 text-white font-semibold px-6 py-2.5 rounded-xl transition flex items-center gap-2 shadow-lg shadow-green-600/20 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
