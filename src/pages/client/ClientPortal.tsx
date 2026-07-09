@@ -452,20 +452,6 @@ export function ClientPortal({
                   Your commission request has been sent to our Resident Makers.
                 </p>
 
-                <div className="max-w-md mx-auto mb-6 p-4 bg-violet-50 text-violet-900 rounded-2xl border border-violet-100 text-sm text-left">
-                  <p className="font-bold">Details & pricing will be sent via email.</p>
-                  <p className="text-violet-900/80 mt-1">
-                    Please refer to your <span className="font-semibold">registered email</span> for updates, quotation, and next steps.
-                  </p>
-                  <p className="text-violet-900/80 mt-2">
-                    Need help? Contact support at{" "}
-                    <a href="mailto:domie.jucutan@dlsu.edu.ph" className="font-semibold underline">
-                      domie.jucutan@dlsu.edu.ph
-                    </a>
-                    .
-                  </p>
-                </div>
-
                 <div className="mb-8 p-5 bg-blue-50 text-blue-800 rounded-2xl border border-blue-100 text-xs text-left space-y-3">
                   <p className="font-bold text-sm text-blue-900 flex items-center gap-1.5">
                     <Mail className="w-4 h-4" /> System Dispatch Notification (Mock Logs)
