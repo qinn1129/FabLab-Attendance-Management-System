@@ -16,6 +16,7 @@ export interface Commission {
   id: string;
   client: string;
   clientEmail: string;
+  clientContactNumber?: string;
   clientType: string;
   affiliation?: string;
   isDlsuStudent?: boolean;
@@ -30,6 +31,7 @@ export interface Commission {
   colorOther?: string;
   filament: string;
   urgency: string;
+  pickupOption?: string;
   weight: number;
   notes: string;
   file: string;
@@ -66,6 +68,7 @@ const seedLocalStorage = (): Commission[] => {
     client: c.client,
     clientEmail: `${c.client.toLowerCase().replace(/\s+/g, ".")}@dlsu.edu.ph`,
     clientType: "Student",
+    clientContactNumber: "",
     affiliation: "",
     isDlsuStudent: true,
     idNumber: `120${(10000 + i).toString()}`,
@@ -79,6 +82,7 @@ const seedLocalStorage = (): Commission[] => {
     colorOther: "",
     filament: c.filament,
     urgency: "Standard (3-5 days)",
+    pickupOption: "Animo Labs FabLab JGIC",
     weight: 150,
     notes: "Preseeded mock commission data.",
     file: c.file === "Has File" ? "model_file.stl" : "",

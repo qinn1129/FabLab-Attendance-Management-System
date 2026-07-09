@@ -30,11 +30,13 @@ export function ClientPortal({
 
   const [form, setForm] = useState({
     name: "", email: "", clientType: "Student",
+    contactNumber: "",
     affiliation: "",
     isDlsuStudent: true,
     idNumber: "", program: "", college: "CCS", department: "",
     service: "", purpose: "Academic / Thesis", purposeOther: "",
     color: "Black", colorOther: "", filament: "PLA", urgency: "Standard (3-5 days)", notes: "",
+    pickupOption: "Animo Labs FabLab JGIC",
     weight: 200
   });
   const [fileName, setFileName] = useState("");
@@ -68,6 +70,11 @@ export function ClientPortal({
     ? "ID number must be exactly 8 digits."
     : "";
 
+  const phoneRegex = /^[+()\-\s\d]{7,}$/;
+  const contactError = form.contactNumber.trim() && !phoneRegex.test(form.contactNumber.trim())
+    ? "Please enter a valid contact number."
+    : "";
+
   const purposeOtherError = form.purpose === "Others" && !form.purposeOther.trim()
     ? "Please specify your purpose."
     : "";
@@ -82,6 +89,7 @@ export function ClientPortal({
       if (isUserLimitReached) return false;
       if (!form.name.trim() || !form.email.trim()) return false;
       if (emailError) return false;
+      if (!form.contactNumber.trim() || contactError) return false;
       if ((form.clientType === "Outsider" || !form.isDlsuStudent) && !form.affiliation.trim()) return false;
       if (form.clientType === "Student") {
         if (!form.idNumber.trim() || !form.program.trim()) return false;
@@ -102,6 +110,7 @@ export function ClientPortal({
       if (form.weight <= 0 || form.weight > 1000) return false;
       if (form.service === "3D Printing With File" && !fileName) return false;
       if (colorOtherError) return false;
+      if (!form.pickupOption) return false;
       return true;
     }
     return true;
@@ -145,6 +154,7 @@ export function ClientPortal({
         id: nextId,
         client: form.name,
         clientEmail: form.email,
+        clientContactNumber: form.contactNumber,
         clientType: form.clientType,
         affiliation: form.affiliation,
         isDlsuStudent: form.isDlsuStudent,
@@ -159,6 +169,7 @@ export function ClientPortal({
         colorOther: form.colorOther,
         filament: form.filament,
         urgency: form.urgency,
+        pickupOption: form.pickupOption,
         weight: form.weight,
         notes: form.notes,
         file: fileName || "None (Design Needed)",
@@ -313,7 +324,7 @@ export function ClientPortal({
                 )}
 
                 <Input label="Full Name" value={form.name} onChange={v => setForm({ ...form, name: v })} placeholder="Juan dela Cruz" required />
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <Input
                     label="Email Address"
                     type="email"
@@ -322,6 +333,14 @@ export function ClientPortal({
                     placeholder="name@dlsu.edu.ph"
                     required
                     error={emailError}
+                  />
+                  <Input
+                    label="Contact Number"
+                    value={form.contactNumber}
+                    onChange={v => setForm({ ...form, contactNumber: v })}
+                    placeholder="+63 9xx xxx xxxx"
+                    required
+                    error={contactError}
                   />
                   <Select
                     label="Client Type"
@@ -452,6 +471,17 @@ export function ClientPortal({
                 )}
                 <Select label="Urgency" value={form.urgency} onChange={v => setForm({ ...form, urgency: v })} options={["Standard (3-5 days)", "Rush (1-2 days)", "No rush"]} />
 
+                <Select
+                  label="Pickup Option"
+                  value={form.pickupOption}
+                  onChange={v => setForm({ ...form, pickupOption: v })}
+                  options={[
+                    "Animo Labs FabLab JGIC",
+                    "Animo Labs TBI Office Br. Andrew",
+                    "Courier",
+                  ]}
+                />
+
                 <Input
                   label="Estimated Weight (grams)"
                   type="number"
@@ -503,6 +533,7 @@ export function ClientPortal({
                   <div className="grid grid-cols-2 gap-4 text-sm">
                     <div><p className="text-gray-500 text-xs mb-1">Name</p><p className="font-semibold text-gray-900">{form.name || "—"}</p></div>
                     <div><p className="text-gray-500 text-xs mb-1">Client Type</p><p className="font-semibold text-gray-900">{form.clientType || "—"}</p></div>
+                    <div><p className="text-gray-500 text-xs mb-1">Contact Number</p><p className="font-semibold text-gray-900">{form.contactNumber || "—"}</p></div>
                     <div><p className="text-gray-500 text-xs mb-1">DLSU Client</p><p className="font-semibold text-gray-900">{form.isDlsuStudent ? "Yes" : "No"}</p></div>
                     {(form.clientType === "Outsider" || !form.isDlsuStudent) && (
                       <div>
@@ -525,6 +556,7 @@ export function ClientPortal({
                     <div><p className="text-gray-500 text-xs mb-1">Weight</p><p className="font-semibold text-gray-900">{form.weight} g</p></div>
                     <div><p className="text-gray-500 text-xs mb-1">Uploaded File</p><p className="font-semibold text-gray-900">{fileName || "None (Design Needed)"}</p></div>
                     <div><p className="text-gray-500 text-xs mb-1">Urgency</p><p className="font-semibold text-gray-900">{form.urgency || "—"}</p></div>
+                    <div><p className="text-gray-500 text-xs mb-1">Pickup Option</p><p className="font-semibold text-gray-900">{form.pickupOption || "—"}</p></div>
                   </div>
                   {form.notes && (
                     <div className="pt-4 border-t border-gray-200">
