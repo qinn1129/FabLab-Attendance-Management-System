@@ -10,11 +10,11 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-GOOGLE_SCRIPT_URL = os.getenv("GOOGLE_SCRIPT_URL", "https://script.google.com/macros/s/AKfycbyWYS8LRjIlQ3xftyxlt6vfI2onRoPka4W3LhppjxX-BK6IwCydZiavSEOrRLRlFX2Q/exec")
+GOOGLE_SCRIPT_URL = os.getenv("GOOGLE_SCRIPT_URL", "https://script.google.com/macros/s/AKfycbwODJl_Ihn9gIu3WCstBl1drKsiYOQoT3roYiQqJlgvIwY_KB3RjD79_q-2x-JcqlFJ/exec")
 WEBAPP_SECRET = os.getenv("WEBAPP_SECRET", "7893402haefudHJFKio&%^*(#G2ghd0")
 
 SENDER_EMAIL = "roughmage33@gmail.com"
-SENDER_APP_PASSWORD = os.getenv("SENDER_APP_PASSWORD", "lbkc vyso bifa qmv") #k
+SENDER_APP_PASSWORD = os.getenv("SENDER_APP_PASSWORD", "lbkc vyso bifa qmvk") 
 
 SMTP_HOST = "smtp.gmail.com"
 SMTP_PORT = 465  # SSL
