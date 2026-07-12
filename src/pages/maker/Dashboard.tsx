@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from "react";
-import { Clock, Package, Pin } from "lucide-react";
+import { Clock, Package, Pin, ChevronLeft, ChevronRight } from "lucide-react";
 import { PageHeader, StatCard, StatusBadge } from "../../components/common";
 import { type Commission } from "../../services/sheetsService";
 import { type Account } from "../../services/accountsService";
 import { announcementsService, type Announcement } from "../../services/announcementsService";
 
 const WEEKLY_HOURS_TARGET = 20;
+const ANNOUNCEMENTS_PER_PAGE = 5;
 
 /**
  * Resident Maker Dashboard view.
@@ -28,8 +29,16 @@ export function MakerDashboard({
   const hoursThisWeek = Number(account.hoursWeek) || 0;
   const totalHours = Number(account.totalHours) || 0;
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+  const [annPage, setAnnPage] = useState(0);
 
   useEffect(() => { announcementsService.fetchAnnouncements().then(setAnnouncements); }, []);
+
+  const totalPages = Math.max(1, Math.ceil(announcements.length / ANNOUNCEMENTS_PER_PAGE));
+  const currentPage = Math.min(annPage, totalPages - 1);
+  const pagedAnnouncements = announcements.slice(
+    currentPage * ANNOUNCEMENTS_PER_PAGE,
+    currentPage * ANNOUNCEMENTS_PER_PAGE + ANNOUNCEMENTS_PER_PAGE
+  );
 
   return (
     <div className="p-6">
@@ -80,16 +89,42 @@ export function MakerDashboard({
         </div>
       </div>
 
-      {/*Upcoming Announcements*/}
+      {/*Announcements*/}
       <div className="bg-card rounded-xl border border-border p-5">
-        <h3 className="text-sm font-semibold text-card-foreground mb-3">Upcoming Announcements</h3>
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-sm font-semibold text-card-foreground">Announcements</h3>
+          {announcements.length > ANNOUNCEMENTS_PER_PAGE && (
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground font-mono">
+                {currentPage + 1} / {totalPages}
+              </span>
+              <button
+                onClick={() => setAnnPage(p => Math.max(0, p - 1))}
+                disabled={currentPage === 0}
+                className="p-1 rounded-md border border-border text-muted-foreground hover:text-foreground hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed transition"
+                aria-label="Previous announcements"
+              >
+                <ChevronLeft className="w-3.5 h-3.5" />
+              </button>
+              <button
+                onClick={() => setAnnPage(p => Math.min(totalPages - 1, p + 1))}
+                disabled={currentPage >= totalPages - 1}
+                className="p-1 rounded-md border border-border text-muted-foreground hover:text-foreground hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed transition"
+                aria-label="Next announcements"
+              >
+                <ChevronRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
+        </div>
+
         {announcements.length === 0 ? (
           <p className="text-xs text-muted-foreground italic py-2">No announcements yet.</p>
         ) : (
-          announcements.slice(0, 2).map(a => (
+          pagedAnnouncements.map(a => (
             <div key={a.id} className="flex gap-3 py-2 border-b border-muted last:border-0">
               {a.pinned && <Pin className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0 mt-0.5" />}
-              <div>
+              <div className="min-w-0 flex-1">
                 <p className="text-sm font-medium text-card-foreground">{a.title}</p>
                 <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{a.body}</p>
               </div>

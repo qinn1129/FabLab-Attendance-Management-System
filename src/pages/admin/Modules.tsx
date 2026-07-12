@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Plus, Youtube, FileText, Trash2 } from "lucide-react";
+import { Plus, Youtube, FileText, Trash2, Edit2, Check, X } from "lucide-react";
 import { PageHeader, Input } from "../../components/common";
 import { modulesService, type TrainingModule } from "../../services/modulesService";
 
@@ -14,6 +14,10 @@ export function AdminModules() {
   const [adding, setAdding] = useState(false);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({ title: "", desc: "", yt: "", gd: "" });
+
+  const [editId, setEditId] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState({ title: "", desc: "", yt: "", gd: "" });
+  const [savingEdit, setSavingEdit] = useState(false);
 
   const loadModules = async () => {
     setLoading(true);
@@ -37,6 +41,25 @@ export function AdminModules() {
   async function deleteMod(id: string) {
     setMods(ms => ms.filter(x => x.id !== id));
     await modulesService.deleteModule(id);
+  }
+
+  function startEdit(m: TrainingModule) {
+    setEditId(m.id);
+    setEditForm({ title: m.title, desc: m.desc, yt: m.yt, gd: m.gd });
+  }
+
+  function cancelEdit() {
+    setEditId(null);
+    setEditForm({ title: "", desc: "", yt: "", gd: "" });
+  }
+
+  async function saveEdit(id: string) {
+    if (!editForm.title.trim()) return;
+    setSavingEdit(true);
+    setMods(ms => ms.map(x => x.id === id ? { ...x, ...editForm } : x));
+    await modulesService.updateModule(id, editForm);
+    setSavingEdit(false);
+    cancelEdit();
   }
 
   return (
@@ -84,37 +107,91 @@ export function AdminModules() {
             </thead>
 
             <tbody>
-              {mods.map((m, i) => (
-                <tr key={m.id} className="border-b border-muted hover:bg-muted/50 transition">
-                  <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{i + 1}</td>
-                  <td className="px-4 py-3 font-semibold text-foreground max-w-[180px]">{m.title}</td>
-                  <td className="px-4 py-3 text-muted-foreground text-xs max-w-[220px] leading-relaxed">{m.desc}</td>
+              {mods.map((m, i) => {
+                const isEditing = editId === m.id;
+                if (isEditing) {
+                  return (
+                    <tr key={`${m.id}-${i}`} className="border-b border-muted bg-emerald-500/5">
+                      <td className="px-4 py-3 font-mono text-xs text-muted-foreground align-top">{i + 1}</td>
+                      <td className="px-4 py-3 align-top" colSpan={4}>
+                        <div className="space-y-2">
+                          <input
+                            value={editForm.title}
+                            onChange={e => setEditForm(f => ({ ...f, title: e.target.value }))}
+                            placeholder="Title"
+                            className="w-full text-xs border border-border bg-background text-foreground rounded px-2 py-1.5 outline-none focus:ring-1 focus:ring-emerald-400"
+                          />
+                          <textarea
+                            value={editForm.desc}
+                            onChange={e => setEditForm(f => ({ ...f, desc: e.target.value }))}
+                            placeholder="Description"
+                            rows={2}
+                            className="w-full text-xs border border-border bg-background text-foreground rounded px-2 py-1.5 outline-none focus:ring-1 focus:ring-emerald-400 resize-none"
+                          />
+                          <div className="grid grid-cols-2 gap-2">
+                            <input
+                              value={editForm.yt}
+                              onChange={e => setEditForm(f => ({ ...f, yt: e.target.value }))}
+                              placeholder="YouTube link"
+                              className="w-full text-xs border border-border bg-background text-foreground rounded px-2 py-1.5 outline-none focus:ring-1 focus:ring-emerald-400"
+                            />
+                            <input
+                              value={editForm.gd}
+                              onChange={e => setEditForm(f => ({ ...f, gd: e.target.value }))}
+                              placeholder="GDrive link"
+                              className="w-full text-xs border border-border bg-background text-foreground rounded px-2 py-1.5 outline-none focus:ring-1 focus:ring-emerald-400"
+                            />
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 align-top">
+                        <div className="flex gap-1">
+                          <button onClick={() => saveEdit(m.id)} disabled={savingEdit} className="p-1.5 bg-emerald-500/20 text-emerald-500 rounded hover:bg-emerald-500/30 transition disabled:opacity-40" title="Save">
+                            <Check className="w-3.5 h-3.5" />
+                          </button>
+                          <button onClick={cancelEdit} className="p-1.5 bg-red-500/20 text-red-500 rounded hover:bg-red-500/30 transition" title="Cancel">
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                }
+                return (
+                  <tr key={`${m.id}-${i}`} className="border-b border-muted hover:bg-muted/50 transition">
+                    <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{i + 1}</td>
+                    <td className="px-4 py-3 font-semibold text-foreground max-w-[180px]">{m.title}</td>
+                    <td className="px-4 py-3 text-muted-foreground text-xs max-w-[220px] leading-relaxed">{m.desc}</td>
 
-                  <td className="px-4 py-3">
-                    {m.yt ? (
-                      <a href={m.yt} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-red-500 hover:text-red-600 text-xs">
-                        <Youtube className="w-3.5 h-3.5" /> Watch
-                      </a>
-                    ) : (
-                      <span className="text-muted-foreground/40 text-xs">—</span>
-                    )}
-                  </td>
+                    <td className="px-4 py-3">
+                      {m.yt ? (
+                        <a href={m.yt} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-red-500 hover:text-red-600 text-xs">
+                          <Youtube className="w-3.5 h-3.5" /> Watch
+                        </a>
+                      ) : (
+                        <span className="text-muted-foreground/40 text-xs">—</span>
+                      )}
+                    </td>
 
-                  <td className="px-4 py-3">
-                    {m.gd ? (
-                      <a href={m.gd} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-blue-500 hover:text-blue-600 text-xs">
-                        <FileText className="w-3.5 h-3.5" /> Open
-                      </a>
-                    ) : (
-                      <span className="text-muted-foreground/40 text-xs">—</span>
-                    )}
-                  </td>
+                    <td className="px-4 py-3">
+                      {m.gd ? (
+                        <a href={m.gd} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-blue-500 hover:text-blue-600 text-xs">
+                          <FileText className="w-3.5 h-3.5" /> Open
+                        </a>
+                      ) : (
+                        <span className="text-muted-foreground/40 text-xs">—</span>
+                      )}
+                    </td>
 
-                  <td className="px-4 py-3">
-                    <button onClick={() => deleteMod(m.id)} className="p-1.5 text-muted-foreground hover:text-red-500 hover:bg-red-500/10 rounded transition"><Trash2 className="w-3.5 h-3.5" /></button>
-                  </td>
-                </tr>
-              ))}
+                    <td className="px-4 py-3">
+                      <div className="flex gap-1">
+                        <button onClick={() => startEdit(m)} className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted rounded transition"><Edit2 className="w-3.5 h-3.5" /></button>
+                        <button onClick={() => deleteMod(m.id)} className="p-1.5 text-muted-foreground hover:text-red-500 hover:bg-red-500/10 rounded transition"><Trash2 className="w-3.5 h-3.5" /></button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

@@ -48,6 +48,11 @@ function setup_modules() {
   getOrCreateSheet(ss, "modules");
 }
 
+function setup_chat() {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  getOrCreateSheet(ss, "chat");
+}
+
 function getOrCreateSheet(ss, name) {
     let sheet = ss.getSheetByName(name);
     if (!sheet) {
@@ -78,6 +83,9 @@ function getOrCreateSheet(ss, name) {
             sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
         } else if (name === "modules") {
             const headers = ["id", "title", "desc", "yt", "gd", "createdAt"];
+            sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+        } else if (name === "chat") {
+            const headers = ["id", "sender", "role", "text", "createdAt"];
             sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
         }
     }
@@ -170,6 +178,10 @@ function doGet(e) {
     const sheet = getOrCreateSheet(ss, sheetname);
     if (!sheet) throw new Error("Sheet not found: " + sheetname);
 
+    if (sheetname === "chat") {
+      purgeExpiredChatMessages(sheet);
+    }
+
     const data = sheet.getDataRange().getValues();
     if (data.length <= 1) return jsonOut([]);
 
@@ -241,6 +253,11 @@ function doPost(e) {
         if (index > -1) newRow[index] = rowData[key];
       }
       sheet.appendRow(newRow);
+
+      if (sheetname === "chat") {
+        purgeExpiredChatMessages(sheet);
+      }
+
       return jsonOut({ success: true });
     }
 
@@ -434,4 +451,30 @@ function handleChangePassword(ss, body) {
 function jsonOut(obj) {
   return ContentService.createTextOutput(JSON.stringify(obj))
     .setMimeType(ContentService.MimeType.JSON);
+}
+
+const CHAT_MESSAGE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
+
+/**
+ * Deletes any row in the "chat" sheet whose createdAt is more than 24
+ * hours old. Called lazily on every read/write to the sheet, so no
+ * separate time-driven trigger is required.
+ */
+function purgeExpiredChatMessages(sheet) {
+  const data = sheet.getDataRange().getValues();
+  if (data.length <= 1) return;
+
+  const headers = data[0];
+  const createdAtIndex = headers.indexOf("createdAt");
+  if (createdAtIndex === -1) return;
+
+  const now = Date.now();
+  // Walk bottom-up so deleting a row doesn't shift the index of rows
+  // still left to check.
+  for (let i = data.length - 1; i >= 1; i--) {
+    const createdAtMs = new Date(data[i][createdAtIndex]).getTime();
+    if (!isNaN(createdAtMs) && (now - createdAtMs) > CHAT_MESSAGE_TTL_MS) {
+      sheet.deleteRow(i + 1);
+    }
+  }
 }

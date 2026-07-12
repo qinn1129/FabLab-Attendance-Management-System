@@ -28,6 +28,7 @@ interface AdminLayoutProps {
   currentScreen: string;
   setScreen: (screen: string) => void;
   onLogout: () => void;
+  adminName: string;
 }
 
 /**
@@ -35,7 +36,7 @@ interface AdminLayoutProps {
  * @param {AdminLayoutProps} props
  * @returns {JSX.Element}
  */
-export function AdminLayout({ children, currentScreen, setScreen, onLogout }: AdminLayoutProps) {
+export function AdminLayout({ children, currentScreen, setScreen, onLogout, adminName }: AdminLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
   return (
@@ -85,7 +86,7 @@ export function AdminLayout({ children, currentScreen, setScreen, onLogout }: Ad
         {children}
       </main>
 
-      <ChatWidget accentColor="emerald" />
+      <ChatWidget accentColor="emerald" senderName={adminName} senderRole="Admin" />
     </div>
   );
 }

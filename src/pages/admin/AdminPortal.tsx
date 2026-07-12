@@ -149,7 +149,12 @@ export function AdminPortal({
   };
 
   return (
-    <AdminLayout currentScreen={screen} setScreen={setScreen} onLogout={handleLogout}>
+    <AdminLayout
+      currentScreen={screen}
+      setScreen={setScreen}
+      onLogout={handleLogout}
+      adminName={`${account!.firstName} ${account!.lastName}`}
+    >
       {renderScreen()}
     </AdminLayout>
   );

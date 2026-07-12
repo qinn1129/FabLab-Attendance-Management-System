@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { ChevronRight, LogOut, Clock, User, Users, Package, Book, Home } from "lucide-react";
+import { ChevronRight, LogOut, Clock, User, Package, Book, Home } from "lucide-react";
 import { ChatWidget } from "../components/common/ChatWidget";
 import { ThemeToggle } from "../components/common";
 import { cn } from "../lib/utils";
@@ -81,7 +81,7 @@ export function MakerLayout({ children, currentScreen, setScreen, onLogout, make
         {children}
       </main>
 
-      <ChatWidget accentColor="emerald" />
+      <ChatWidget accentColor="emerald" senderName={makerName} senderRole="ResidentMaker" />
     </div>
   );
 }
