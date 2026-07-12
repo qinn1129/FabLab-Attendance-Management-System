@@ -38,6 +38,15 @@ function setup_announcements() {
   getOrCreateSheet(ss, "announcements");
 }
 
+function setup_faqs() {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  getOrCreateSheet(ss, "faqs");
+}
+
+function setup_modules() {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  getOrCreateSheet(ss, "modules");
+}
 
 function getOrCreateSheet(ss, name) {
     let sheet = ss.getSheetByName(name);
@@ -60,6 +69,15 @@ function getOrCreateSheet(ss, name) {
             sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
         } else if (name === "weeklyScheds") {
             const headers = ["resident_ID", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+            sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+        } else if (name === "announcements") {
+            const headers = ["id", "title", "body", "date", "pinned", "createdAt"];
+            sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+        } else if (name === "faqs") {
+            const headers = ["id", "q", "a", "createdAt"];
+            sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+        } else if (name === "modules") {
+            const headers = ["id", "title", "desc", "yt", "gd", "createdAt"];
             sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
         }
     }

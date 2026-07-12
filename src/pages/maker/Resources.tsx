@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from "react";
 import { Check, Pin, Youtube, Link2, ChevronDown } from "lucide-react";
 import { PageHeader } from "../../components/common";
-import { ANNOUNCEMENTS_DATA, MODULES_DATA, FAQS_DATA } from "../../constants/mockData";
 import { accountsService, type Account } from "../../services/accountsService";
 import { sheetsService, type WeeklySchedule } from "../../services/sheetsService";
 import { announcementsService, type Announcement } from "../../services/announcementsService";
+import { faqService, type FAQ } from "../../services/faqService";
+import { modulesService, type TrainingModule } from "../../services/modulesService";
 
 const dayMap: Record<string, string> = {
   "Mon": "Monday",
@@ -23,22 +24,20 @@ const dayMap: Record<string, string> = {
  */
 export function MakerResources() {
   const [tab, setTab] = useState<"schedule"|"announcements"|"modules"|"faq">("schedule");
-  const [faqOpen, setFaqOpen] = useState<number | null>(null);
+  const [faqOpen, setFaqOpen] = useState<string | null>(null);
   const [makers, setMakers] = useState<Account[]>([]);
   const [weeklyScheds, setWeeklyScheds] = useState<WeeklySchedule[]>([]);
-  const days = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
-
-useEffect(() => {
-  accountsService.fetchResidentMakers().then(setMakers);
-  sheetsService.fetchWeeklySchedules().then(setWeeklyScheds);
-  announcementsService.fetchAnnouncements().then(setAnnouncements);
-}, []);
-
+  const [faqs, setFaqs] = useState<FAQ[]>([]);
+  const [modules, setModules] = useState<TrainingModule[]>([]);
+  const days = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
 
   useEffect(() => {
     accountsService.fetchResidentMakers().then(setMakers);
     sheetsService.fetchWeeklySchedules().then(setWeeklyScheds);
+    announcementsService.fetchAnnouncements().then(setAnnouncements);
+    faqService.fetchFAQs().then(setFaqs);
+    modulesService.fetchModules().then(setModules);
   }, []);
 
   return (
@@ -94,7 +93,9 @@ useEffect(() => {
       {/*Announcements*/}
       {tab === "announcements" && (
         <div className="space-y-3">
-          {announcements.map(a => (
+          {announcements.length === 0 ? (
+            <p className="text-muted-foreground text-sm">No announcements yet.</p>
+          ) : announcements.map(a => (
             <div key={a.id} className={`bg-card rounded-xl border p-5 ${a.pinned ? "border-emerald-500/30" : "border-border"}`}>
               <div className="flex items-center gap-2 mb-1">
                 {a.pinned && <Pin className="w-3.5 h-3.5 text-emerald-500" />}
@@ -119,13 +120,27 @@ useEffect(() => {
               </tr>
             </thead>
             <tbody>
-              {MODULES_DATA.map((m, i) => (
+              {modules.length === 0 ? (
+                <tr><td colSpan={5} className="px-4 py-6 text-center text-muted-foreground text-sm">No modules yet.</td></tr>
+              ) : modules.map((m, i) => (
                 <tr key={m.id} className="border-b border-muted hover:bg-muted/50 transition">
                   <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{i + 1}</td>
                   <td className="px-4 py-3 font-semibold text-foreground">{m.title}</td>
                   <td className="px-4 py-3 text-muted-foreground text-xs max-w-[200px]">{m.desc}</td>
-                  <td className="px-4 py-3"><a href={m.yt} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-red-500 hover:text-red-600 text-xs"><Youtube className="w-3.5 h-3.5" />Watch</a></td>
-                  <td className="px-4 py-3"><a href={m.gd} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-blue-500 hover:text-blue-600 text-xs"><Link2 className="w-3.5 h-3.5" />Open</a></td>
+                  <td className="px-4 py-3">
+                    {m.yt ? (
+                      <a href={m.yt} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-red-500 hover:text-red-600 text-xs"><Youtube className="w-3.5 h-3.5" />Watch</a>
+                    ) : (
+                      <span className="text-muted-foreground/40 text-xs">—</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3">
+                    {m.gd ? (
+                      <a href={m.gd} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-blue-500 hover:text-blue-600 text-xs"><Link2 className="w-3.5 h-3.5" />Open</a>
+                    ) : (
+                      <span className="text-muted-foreground/40 text-xs">—</span>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -136,7 +151,9 @@ useEffect(() => {
       {/*FAQ*/}
       {tab === "faq" && (
         <div className="space-y-2 max-w-2xl">
-          {FAQS_DATA.map(f => (
+          {faqs.length === 0 ? (
+            <p className="text-muted-foreground text-sm">No FAQs yet.</p>
+          ) : faqs.map(f => (
             <div key={f.id} className="bg-card rounded-xl border border-border overflow-hidden">
               <button className="w-full flex items-center justify-between gap-3 px-5 py-4 text-left hover:bg-muted/50 transition" onClick={() => setFaqOpen(faqOpen === f.id ? null : f.id)}>
                 <span className="font-medium text-card-foreground text-sm">{f.q}</span>
