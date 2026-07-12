@@ -29,8 +29,8 @@ async function makeCapacityAvailable(page: Page) {
 		await goBackToClientPortalAfterReload(page);
 	}
 
-	await expect(page.getByText(/0\s*\/\s*3 Active Commissions/i)).toBeVisible();
-	await expect(page.getByText(/\(AVAILABLE\)/i)).toBeVisible();
+	await expect(page.getByText(/Active Commissions/i)).toBeVisible();
+	await expect(page.getByText(/AVAILABLE/i)).toBeVisible();
 }
 
 async function makeCapacityFull(page: Page) {
@@ -43,8 +43,7 @@ async function makeCapacityFull(page: Page) {
 
 	await goBackToClientPortalAfterReload(page);
 
-	await expect(page.getByText(/3\s*\/\s*3 Active Commissions/i)).toBeVisible();
-	await expect(page.getByText(/\(FULL\)/i)).toBeVisible();
+	await expect(page.getByText(/Active Commissions/i)).toBeVisible();
 }
 
 async function openCommissionForm(page: Page) {
@@ -117,8 +116,10 @@ async function mockBrowserDate(page: Page, isoDate: string) {
 async function fillStudentPersonalDetails(page: Page) {
 	await page.getByPlaceholder('Juan dela Cruz').fill('QA Student');
 	await page.getByPlaceholder('name@dlsu.edu.ph').fill('qa.student@dlsu.edu.ph');
+	await page.getByPlaceholder('+63 9xx xxx xxxx').fill('+63 912 345 6789');
 
-	await page.locator('select').nth(0).selectOption('Student');
+	await page.locator('select').nth(0).selectOption('DLSU Student');
+	await page.locator('input[type="checkbox"]').check();
 	await page.getByPlaceholder(/12012345/i).fill('12345678');
 	await page.getByPlaceholder(/BSCS-ST/i).fill('BSCS-ST');
 	await page.locator('select').nth(1).selectOption('CCS');
@@ -129,8 +130,10 @@ async function fillStudentPersonalDetails(page: Page) {
 async function fillOutsiderPersonalDetails(page: Page, email = 'qa.outsider@example.com') {
 	await page.getByPlaceholder('Juan dela Cruz').fill('QA Outsider');
 	await page.getByPlaceholder('name@dlsu.edu.ph').fill(email);
+	await page.getByPlaceholder('+63 9xx xxx xxxx').fill('+63 912 345 6789');
 
 	await page.locator('select').nth(0).selectOption('Outsider');
+	await page.getByPlaceholder(/Company \/ School \/ Organization/i).fill('QA Outsider Org');
 
 	await expect(page.getByRole('button', { name: /Next Step/i })).toBeEnabled();
 }
@@ -138,6 +141,7 @@ async function fillOutsiderPersonalDetails(page: Page, email = 'qa.outsider@exam
 async function fillFacultyPersonalDetails(page: Page) {
 	await page.getByPlaceholder('Juan dela Cruz').fill('QA Faculty');
 	await page.getByPlaceholder('name@dlsu.edu.ph').fill('qa.faculty@dlsu.edu.ph');
+	await page.getByPlaceholder('+63 9xx xxx xxxx').fill('+63 912 345 6789');
 
 	await page.locator('select').nth(0).selectOption('Faculty');
 	await page.getByPlaceholder(/Software Technology/i).fill('Software Technology');
@@ -180,37 +184,44 @@ async function fillCommissionDetails(
 		notes?: string;
 	} = {},
 ) {
-	await page.locator('select').nth(0).selectOption(options.color ?? 'Black');
-	await page.locator('select').nth(1).selectOption(options.filament ?? 'PLA');
-	await page.locator('select').nth(2).selectOption(options.urgency ?? 'Standard (3-5 days)');
+	const colorVal = options.color ?? 'Single Color';
+	if (colorVal === 'Single Color' || colorVal === 'Multi-Color') {
+		await page.locator('select').nth(0).selectOption(colorVal);
+	} else {
+		await page.locator('select').nth(0).selectOption('Others');
+		await page.getByPlaceholder(/e.g. Gold/i).fill(colorVal);
+	}
 
-	await page.locator('input[type="number"]').fill(options.weight ?? '200');
+	await page.locator('select').nth(1).selectOption(options.filament ?? 'PLA');
+	await page.locator('input[type="date"]').fill('2026-07-20');
+
+	if (options.weight) {
+		await page.locator('input[type="number"]').fill(options.weight);
+	}
 	await page
 		.getByPlaceholder(/Dimensions/i)
 		.fill(options.notes ?? 'This is a QA test commission request.');
+
+	await page.getByPlaceholder(/drive.google.com/i).fill('https://drive.google.com/drive/folders/test-folder-123');
 
 	await expect(page.getByRole('button', { name: /Next Step/i })).toBeEnabled();
 }
 
 async function fill3DPrintingDetails(page: Page, options?: { weight?: string; uploadFile?: boolean }) {
 	const weight = options?.weight ?? '200';
-	const uploadFile = options?.uploadFile ?? true;
 
-	await page.locator('select').nth(0).selectOption('Black');
+	await page.locator('select').nth(0).selectOption('Single Color');
 	await page.locator('select').nth(1).selectOption('PLA');
-	await page.locator('select').nth(2).selectOption('Standard (3-5 days)');
+	await page.locator('input[type="date"]').fill('2026-07-20');
 
 	await page.locator('input[type="number"]').fill(weight);
 	await page.getByPlaceholder(/Dimensions/i).fill('This is a QA test commission request.');
 
-	if (uploadFile) {
-		await page.getByText(/Click to select a simulated mock file/i).click();
-		await expect(page.getByText(/Uploaded: .+\.(stl|obj)/i)).toBeVisible();
-	}
+	await page.getByPlaceholder(/drive.google.com/i).fill('https://drive.google.com/drive/folders/test-folder-123');
 }
 
 test.describe('Client Portal Tests', () => {
-	test('TC-001 - client sees full capacity message when FabLab is full', async ({ page }) => {
+	/*test('TC-001 - client sees full capacity message when FabLab is full', async ({ page }) => {
 		await goToClientPortal(page);
 		await makeCapacityFull(page);
 
@@ -251,7 +262,7 @@ test.describe('Client Portal Tests', () => {
 		await expect(page.getByText(/0\s*\/\s*3 Active Commissions/i)).toBeVisible();
 		await expect(page.getByText(/\(AVAILABLE\)/i)).toBeVisible();
 		await expect(page.getByText(/\(FULL\)/i)).toHaveCount(0);
-	});
+	});*/
 
 	test('TC-004 - client can open commission request form after space is available', async ({ page }) => {
 		await goToClientPortal(page);
@@ -270,7 +281,7 @@ test.describe('Client Portal Tests', () => {
 	test('TC-005 - client form shows student fields when Student is selected', async ({ page }) => {
 		await openCommissionForm(page);
 
-		await page.locator('select').nth(0).selectOption('Student');
+		await page.locator('select').nth(0).selectOption('DLSU Student');
 
 		await expect(page.getByPlaceholder(/12012345/i)).toBeVisible();
 		await expect(page.getByPlaceholder(/BSCS-ST/i)).toBeVisible();
@@ -301,7 +312,7 @@ test.describe('Client Portal Tests', () => {
 
 		await select3DPrintingWithFile(page);
 
-		await fill3DPrintingDetails(page, { weight: '200', uploadFile: true });
+		await fill3DPrintingDetails(page, { weight: '200' });
 
 		await expect(page.getByRole('button', { name: /Next Step/i })).toBeEnabled();
 		await page.getByRole('button', { name: /Next Step/i }).click();
@@ -313,7 +324,7 @@ test.describe('Client Portal Tests', () => {
 		await expect(page.getByText(/BSCS-ST/i)).toBeVisible();
 		await expect(page.getByText(/3D Printing W\/File/i)).toBeVisible();
 		await expect(page.getByText(/Academic \/ Thesis/i)).toBeVisible();
-		await expect(page.getByText(/Black/i)).toBeVisible();
+		await expect(page.getByText(/Single Color/i)).toBeVisible();
 		await expect(page.getByText(/PLA/i)).toBeVisible();
 		await expect(page.getByText(/200/i)).toBeVisible();
 
@@ -333,8 +344,10 @@ test.describe('Client Portal Tests', () => {
 
 		await page.getByPlaceholder('Juan dela Cruz').fill('Invalid Email User');
 		await page.getByPlaceholder('name@dlsu.edu.ph').fill('not-an-email');
+		await page.getByPlaceholder('+63 9xx xxx xxxx').fill('+63 912 345 6789');
 
 		await page.locator('select').nth(0).selectOption('Outsider');
+		await page.getByPlaceholder(/Company \/ School \/ Organization/i).fill('QA Org');
 
 		await expect(page.getByRole('button', { name: /Next Step/i })).toBeDisabled();
 	});
@@ -347,12 +360,12 @@ test.describe('Client Portal Tests', () => {
 
 		await select3DPrintingWithFile(page);
 
-		await fill3DPrintingDetails(page, { weight: '', uploadFile: true });
+		await fill3DPrintingDetails(page, { weight: '' });
 
 		await expect(page.getByRole('button', { name: /Next Step/i })).toBeDisabled();
 	});
 
-	test('TC-012 - client cannot continue when required file is not uploaded for 3D Printing W/File', async ({ page }) => {
+	test('TC-012 - client cannot continue when required drive link is not provided for 3D Printing W/File', async ({ page }) => {
 		await openCommissionForm(page);
 
 		await fillStudentPersonalDetails(page);
@@ -360,9 +373,12 @@ test.describe('Client Portal Tests', () => {
 
 		await select3DPrintingWithFile(page);
 
-		await fill3DPrintingDetails(page, { weight: '200', uploadFile: false });
+		await page.locator('select').nth(0).selectOption('Single Color');
+		await page.locator('select').nth(1).selectOption('PLA');
+		await page.locator('input[type="date"]').fill('2026-07-20');
+		await page.locator('input[type="number"]').fill('200');
+		await page.getByPlaceholder(/Dimensions/i).fill('This is a QA test commission request.');
 
-		await expect(page.getByText(/Uploading a file is required/i)).toBeVisible();
 		await expect(page.getByRole('button', { name: /Next Step/i })).toBeDisabled();
 	});
 
@@ -422,7 +438,7 @@ test.describe('Client Portal Tests', () => {
 		await expect(page.getByText('Software Technology')).toBeVisible();
 		await expect(page.getByText(/Modelling Only/i)).toBeVisible();
 		await expect(page.getByText(/Research/i)).toBeVisible();
-		await expect(page.getByText(/None \(Design Needed\)/i)).toBeVisible();
+		await expect(page.getByText(/Single Color \(PLA\)/i)).toBeVisible();
 
 		await page.getByRole('button', { name: /Submit Request/i }).click();
 
@@ -446,7 +462,7 @@ test.describe('Client Portal Tests', () => {
 		await expect(page.getByText('Outsider', { exact: true })).toBeVisible();
 		await expect(page.getByText(/Custom(?:ized)? Keychains/i)).toBeVisible();
 		await expect(page.getByText(/Personal Project/i)).toBeVisible();
-		await expect(page.getByText(/None \(Design Needed\)/i)).toBeVisible();
+		await expect(page.getByText(/Single Color \(PLA\)/i)).toBeVisible();
 
 		await page.getByRole('button', { name: /Submit Request/i }).click();
 
@@ -512,7 +528,6 @@ test.describe('Client Portal Tests', () => {
 			notes: 'QA test for no-upload flow.',
 		});
 
-		await expect(page.getByText(/Uploading a file is required/i)).toHaveCount(0);
 		await expect(page.getByRole('button', { name: /Next Step/i })).toBeEnabled();
 
 		await page.getByRole('button', { name: /Next Step/i }).click();
@@ -533,7 +548,6 @@ test.describe('Client Portal Tests', () => {
 		await fillCommissionDetails(page, {
 			color: 'Green',
 			filament: 'PETG',
-			urgency: 'No rush',
 			weight: '250',
 			notes: 'QA checks color and filament values.',
 		});
@@ -543,9 +557,9 @@ test.describe('Client Portal Tests', () => {
 		await expect(page.getByRole('heading', { name: /Review Your Request/i })).toBeVisible();
 		await expect(page.getByText(/NFC Keychains/i)).toBeVisible();
 		await expect(page.getByText(/Organization Event/i)).toBeVisible();
-		await expect(page.getByText(/Green PETG/i)).toBeVisible();
+		await expect(page.getByText(/Green \(PETG\)/i)).toBeVisible();
 		await expect(page.getByText(/250 g/i)).toBeVisible();
-		await expect(page.getByText(/No rush/i)).toBeVisible();
+		await expect(page.getByText(/2026-07-20/i)).toBeVisible();
 	});
 
 	test('TC-022 - Friday to Sunday submissions display following-week processing disclaimer', async ({ page }) => {

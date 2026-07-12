@@ -29,31 +29,23 @@ export function ClientPortal({
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [form, setForm] = useState({
-    name: "", email: "", clientType: "Student",
+    name: "", email: "", clientType: "DLSU Student",
     contactNumber: "",
     affiliation: "",
     isDlsuStudent: true,
     idNumber: "", program: "", college: "CCS", department: "",
     service: "", purpose: "Academic / Thesis", purposeOther: "",
-    color: "Black", colorOther: "", filament: "PLA", expectedPickupDate: "Standard (3-5 days)", notes: "",
-    pickupOption: "Animo Labs FabLab JGIC",
+    color: "Single Color", colorOther: "", filament: "PLA", expectedPickupDate: "", notes: "",
+    pickupOption: "JGIC 201 Pickup (Laguna Campus)",
     driveLink: "",
-    weight: 200
+    weight: 200,
+    isWeightNA: false
   });
   const [mockLogs, setMockLogs] = useState<string[]>([]);
 
   // Capacity validation
   const activeCommissions = commissions.filter(c => c.status !== "Completed" && c.status !== "Rejected" && c.status !== "Awaiting Approval");
   const activeCount = activeCommissions.length;
-  const isLabFull = activeCount >= 3;
-
-  // Client validation
-  const userActiveCount = commissions.filter(
-    c => c.clientEmail?.toLowerCase() === form.email.trim().toLowerCase() &&
-      c.status !== "Completed" &&
-      c.status !== "Rejected"
-  ).length;
-  const isUserLimitReached = userActiveCount >= 3;
 
   // Weekend disclaimer check: Friday (5), Saturday (6), Sunday (0)
   const isWeekend = [0, 5, 6].includes(new Date().getDay());
@@ -66,7 +58,7 @@ export function ClientPortal({
     ? "Please enter a valid email address."
     : "";
 
-  const idError = form.clientType === "Student" && form.idNumber.trim() && !idRegex.test(form.idNumber.trim())
+  const idError = form.clientType === "DLSU Student" && form.idNumber.trim() && !idRegex.test(form.idNumber.trim())
     ? "ID number must be exactly 8 digits."
     : "";
 
@@ -79,7 +71,7 @@ export function ClientPortal({
     ? "Please specify your purpose."
     : "";
 
-  const colorOtherError = form.color === "Other" && !form.colorOther.trim()
+  const colorOtherError = form.color === "Others" && !form.colorOther.trim()
     ? "Please specify your preferred color."
     : "";
 
@@ -91,18 +83,20 @@ export function ClientPortal({
   // Step validation check
   const isStepValid = () => {
     if (step === 1) {
-      if (isUserLimitReached) return false;
       if (!form.name.trim() || !form.email.trim()) return false;
       if (emailError) return false;
       if (!form.contactNumber.trim() || contactError) return false;
-      if ((form.clientType === "Outsider" || !form.isDlsuStudent) && !form.affiliation.trim()) return false;
-      if (form.clientType === "Student") {
-        if (!form.idNumber.trim() || !form.program.trim()) return false;
+      
+      if (form.clientType === "DLSU Student") {
+        if (!form.isDlsuStudent) return false;
+        if (!form.idNumber.trim() || !form.program.trim() || !form.college) return false;
         if (idError) return false;
-        return true;
-      }
-      if (form.clientType === "Faculty") {
-        return !!form.department.trim();
+      } else if (form.clientType === "Non-DLSU Student") {
+        if (!form.affiliation.trim()) return false;
+      } else if (form.clientType === "Faculty") {
+        if (!form.department.trim()) return false;
+      } else if (form.clientType === "Outsider") {
+        if (!form.affiliation.trim()) return false;
       }
       return true;
     }
@@ -112,9 +106,10 @@ export function ClientPortal({
       return true;
     }
     if (step === 3) {
-      if (form.weight <= 0 || form.weight > 1000) return false;
+      if (!form.isWeightNA && (form.weight <= 0 || form.weight > 1000)) return false;
       if (colorOtherError) return false;
       if (driveLinkError) return false;
+      if (!form.expectedPickupDate) return false;
       if (!form.pickupOption) return false;
       return true;
     }
@@ -126,19 +121,6 @@ export function ClientPortal({
     try {
       // Fetch the latest commissions directly from Google Sheets/localStorage fallback first
       const currentCommissions = await sheetsService.fetchCommissions();
-
-      // Double check active limit against the freshest sheets data
-      const activeCountForUser = currentCommissions.filter(
-        c => c.clientEmail?.toLowerCase() === form.email.trim().toLowerCase() &&
-          c.status !== "Completed" &&
-          c.status !== "Rejected"
-      ).length;
-
-      if (activeCountForUser >= 3) {
-        alert("Submission failed: You already have 3 active commissions in progress.");
-        setIsSubmitting(false);
-        return;
-      }
 
       // Find the highest current numeric ID to avoid duplicates if rows are filtered or deleted
       let maxIdNum = 0;
@@ -204,8 +186,8 @@ export function ClientPortal({
         {/* Helper Toolbar for displaying capacity */}
         <div className="bg-gray-100 text-gray-700 py-1.5 px-4 text-xs font-mono flex flex-col sm:flex-row sm:items-center justify-between border-b border-gray-200 gap-2">
           <div className="flex items-center gap-1.5">
-            <span className={activeCount >= 3 ? "w-2 h-2 rounded-full bg-red-500 animate-pulse" : "w-2 h-2 rounded-full bg-green-500 animate-pulse"} />
-            <span>FabLab Capacity: <strong>{activeCount} / 3 Active Commissions</strong> ({activeCount >= 3 ? "FULL" : "AVAILABLE"})</span>
+            <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+            <span>FabLab Capacity: <strong>{activeCount} Active Commissions</strong> (Queue is AVAILABLE)</span>
           </div>
           {!import.meta.env.VITE_GOOGLE_SCRIPT_URL && (
             <div className="flex gap-3">
@@ -241,11 +223,7 @@ export function ClientPortal({
         </header>
         <main>
           <HeroSection onStart={() => {
-            if (isLabFull) {
-              setStep(99); // Route to Full Capacity alert page
-            } else {
-              setStep(1);
-            }
+            setStep(1);
           }} />
           <ServicesSection />
           <WorkshopsSection />
@@ -254,35 +232,6 @@ export function ClientPortal({
         <footer className="bg-gray-900 text-white/50 text-center py-8 text-sm">
           <p>© 2026 Animo Labs FabLab. All rights reserved.</p>
         </footer>
-      </div>
-    );
-  }
-
-  // Full Capacity View
-  if (step === 99) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex flex-col justify-center items-center p-6 light">
-        <div className="w-full max-w-md bg-white rounded-3xl shadow-xl shadow-gray-200/50 border border-gray-100 p-8 text-center">
-          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6">
-            <AlertTriangle className="w-8 h-8 text-red-600" />
-          </div>
-          <h3 className="text-xl font-bold text-gray-900 mb-2">FabLab is Full</h3>
-          <p className="text-gray-600 text-sm mb-6 leading-relaxed">
-            Sorry! The FabLab is currently at full capacity handling the maximum of 3 concurrent active commissions.
-            New submissions are temporarily paused.
-          </p>
-          <div className="p-4 bg-gray-50 rounded-xl border border-gray-200 text-xs text-gray-500 text-left mb-6 space-y-1">
-            <p className="font-bold text-gray-700">How to proceed?</p>
-            <p>1. Try again later once current commissions are completed.</p>
-            <p>2. For bulk/partner requests, contact <strong className="text-gray-700">Domie James Jucutan</strong> at <a href="mailto:hello@animolabs.ph" className="text-violet-600 underline">hello@animolabs.ph</a>.</p>
-          </div>
-          <button
-            onClick={() => setStep(0)}
-            className="w-full bg-gray-900 hover:bg-gray-800 text-white font-semibold py-3 rounded-xl transition"
-          >
-            Return to Home
-          </button>
-        </div>
       </div>
     );
   }
@@ -316,19 +265,6 @@ export function ClientPortal({
               <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
                 <h3 className="text-lg font-bold text-gray-900 mb-4">Personal Details</h3>
 
-                {isUserLimitReached && (
-                  <div className="p-4 bg-red-50 text-red-800 border border-red-200 rounded-xl text-xs space-y-1.5 animate-in fade-in duration-300">
-                    <p className="font-bold text-red-900 flex items-center gap-1">
-                      <AlertTriangle className="w-4 h-4" /> Maximum Commissions Reached
-                    </p>
-                    <p>
-                      You currently have {userActiveCount} active commissions in progress.
-                      The FabLab restricts clients to a maximum of 3 concurrent active commissions.
-                      Please message <strong>Domie James Jucutan</strong> or email <a href="mailto:hello@animolabs.ph" className="underline font-bold text-red-950">hello@animolabs.ph</a> to manage your active slots.
-                    </p>
-                  </div>
-                )}
-
                 <Input label="Full Name" value={form.name} onChange={v => setForm({ ...form, name: v })} placeholder="Juan dela Cruz" required />
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <Input
@@ -355,29 +291,64 @@ export function ClientPortal({
                       setForm({
                         ...form,
                         clientType: v,
-                        // Outsiders shouldn't see the DLSU checkbox; treat them as non-DLSU.
-                        isDlsuStudent: v === "Outsider" ? false : form.isDlsuStudent,
+                        isDlsuStudent: v === "DLSU Student",
+                        affiliation: "",
+                        idNumber: "",
+                        program: "",
+                        department: "",
                       })
                     }
-                    options={["Student", "Faculty", "Outsider"]}
+                    options={["DLSU Student", "Non-DLSU Student", "Faculty", "Outsider"]}
                   />
                 </div>
 
-                {form.clientType !== "Outsider" && (
-                  <label className="flex items-center gap-2 select-none cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={form.isDlsuStudent}
-                      onChange={e => setForm({ ...form, isDlsuStudent: e.target.checked })}
-                      className="w-4 h-4 rounded border-gray-300 text-violet-600 focus:ring-violet-400"
-                    />
-                    <span className="text-sm text-gray-700">
-                      I am from De La Salle University (DLSU)
-                    </span>
-                  </label>
+                {form.clientType === "DLSU Student" && (
+                  <>
+                    <label className="flex items-center gap-2 select-none cursor-pointer p-1 animate-in fade-in duration-200">
+                      <input
+                        type="checkbox"
+                        checked={form.isDlsuStudent}
+                        onChange={e => setForm({ ...form, isDlsuStudent: e.target.checked })}
+                        className="w-4 h-4 rounded border-gray-300 text-violet-600 focus:ring-violet-400"
+                      />
+                      <span className="text-sm font-semibold text-gray-800">
+                        I verify that I am a student of De La Salle University (DLSU) *
+                      </span>
+                    </label>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 animate-in fade-in duration-200">
+                      <Input
+                        label="ID Number"
+                        value={form.idNumber}
+                        onChange={v => setForm({ ...form, idNumber: v })}
+                        placeholder="e.g. 12012345"
+                        required
+                        error={idError}
+                      />
+                      <Input label="Program" value={form.program} onChange={v => setForm({ ...form, program: v })} placeholder="e.g. BSCS-ST" required />
+                      <Select label="College" value={form.college} onChange={v => setForm({ ...form, college: v })} options={["CCS", "GCOE", "CLA", "COS", "RVRCOB", "BAGCED", "SOE"]} />
+                    </div>
+                  </>
                 )}
 
-                {(form.clientType === "Outsider" || !form.isDlsuStudent) && (
+                {form.clientType === "Non-DLSU Student" && (
+                  <div className="animate-in fade-in duration-200">
+                    <Input
+                      label="College / University Name"
+                      value={form.affiliation}
+                      onChange={v => setForm({ ...form, affiliation: v })}
+                      placeholder="e.g. Ateneo de Manila University"
+                      required
+                    />
+                  </div>
+                )}
+
+                {form.clientType === "Faculty" && (
+                  <div className="grid grid-cols-1 gap-4 animate-in fade-in duration-200">
+                    <Input label="Department" value={form.department} onChange={v => setForm({ ...form, department: v })} placeholder="e.g. Software Technology" required />
+                  </div>
+                )}
+
+                {form.clientType === "Outsider" && (
                   <div className="animate-in fade-in duration-200">
                     <Input
                       label="Affiliation"
@@ -388,46 +359,104 @@ export function ClientPortal({
                     />
                   </div>
                 )}
-
-                {form.clientType === "Student" && (
-                  <div className="grid grid-cols-3 gap-4 animate-in fade-in duration-200">
-                    <Input
-                      label="ID Number"
-                      value={form.idNumber}
-                      onChange={v => setForm({ ...form, idNumber: v })}
-                      placeholder="e.g. 12012345"
-                      required
-                      error={idError}
-                    />
-                    <Input label="Program" value={form.program} onChange={v => setForm({ ...form, program: v })} placeholder="e.g. BSCS-ST" required />
-                    <Select label="College" value={form.college} onChange={v => setForm({ ...form, college: v })} options={["CCS", "GCOE", "CLA", "COS", "RVRCOB", "BAGCED", "SOE"]} />
-                  </div>
-                )}
-
-                {form.clientType === "Faculty" && (
-                  <div className="grid grid-cols-1 gap-4 animate-in fade-in duration-200">
-                    <Input label="Department" value={form.department} onChange={v => setForm({ ...form, department: v })} placeholder="e.g. Software Technology" required />
-                  </div>
-                )}
               </div>
             )}
 
             {/*Step 2*/}
             {step === 2 && (
-              <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                <h3 className="text-lg font-bold text-gray-900 mb-4">Service Selection</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                  {["3D Printing With File", "3D Printing Without File (Modelling Needed)", "Modelling Only", "Customized Keychains", "NFC Keychains"].map(s => (
-                    <button
-                      key={s}
-                      onClick={() => setForm({ ...form, service: s })}
-                      className={`p-4 rounded-xl border-2 text-left transition ${form.service === s ? "border-violet-600 bg-violet-50" : "border-gray-100 hover:border-violet-200"}`}
-                    >
-                      <div className={`w-4 h-4 rounded-full border-2 mb-2 ${form.service === s ? "border-violet-600 bg-violet-600" : "border-gray-300"}`} />
-                      <p className="font-semibold text-gray-900 text-sm">{s}</p>
-                    </button>
-                  ))}
+              <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                <div>
+                  <h3 className="text-lg font-bold text-gray-900 mb-1">Service Selection</h3>
+                  <p className="text-gray-500 text-xs">Select a service to request a commission from the FabLab.</p>
                 </div>
+
+                {/* Main Active Category */}
+                <div className="border border-violet-100 bg-violet-50/20 rounded-2xl p-5">
+                  <div className="flex items-center gap-2 mb-4">
+                    <span className="px-2 py-0.5 text-[10px] font-bold tracking-wider uppercase bg-violet-600 text-white rounded-md">Active</span>
+                    <h4 className="font-bold text-gray-900 text-sm">FDM 3D Printing Sub-Services</h4>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {[
+                      {
+                        id: "3D Printing With File",
+                        name: "3D Printing W/File",
+                        desc: "Print using your own STL/OBJ design files.",
+                        image: "https://images.unsplash.com/photo-1615840287214-7fe58a8f668f?w=600&auto=format&fit=crop"
+                      },
+                      {
+                        id: "3D Printing Without File (Modelling Needed)",
+                        name: "3D Printing W/O File",
+                        desc: "Have an idea but no 3D model? We'll model and print it.",
+                        image: "https://images.unsplash.com/photo-1531525645387-7f14be1bdbbd?w=600&auto=format&fit=crop"
+                      },
+                      {
+                        id: "Modelling Only",
+                        name: "Modelling Only",
+                        desc: "Need a 3D digital CAD model without physical fabrication.",
+                        image: "https://images.unsplash.com/photo-1581092160607-ee22621dd758?w=600&auto=format&fit=crop"
+                      },
+                      {
+                        id: "Customized Keychains",
+                        name: "Customized Keychains",
+                        desc: "Personalized keychains customized with name/logo.",
+                        image: "https://images.unsplash.com/photo-1584622650111-993a426fbf0a?w=600&auto=format&fit=crop"
+                      },
+                      {
+                        id: "NFC Keychains",
+                        name: "NFC Keychains",
+                        desc: "Smart keychains with embedded programmable NFC tags.",
+                        image: "https://images.unsplash.com/photo-1563013544-824ae1d704d3?w=600&auto=format&fit=crop"
+                      }
+                    ].map(s => (
+                      <button
+                        key={s.id}
+                        onClick={() => setForm({ ...form, service: s.id })}
+                        className={`group relative overflow-hidden rounded-xl border-2 text-left transition flex flex-col h-[180px] ${form.service === s.id ? "border-violet-600 ring-2 ring-violet-400/20" : "border-gray-200 hover:border-violet-300"}`}
+                      >
+                        <div className="w-full h-[80px] overflow-hidden relative bg-gray-100">
+                          <img
+                            src={s.image}
+                            alt={s.name}
+                            className="w-full h-full object-cover transition duration-300 group-hover:scale-105"
+                          />
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
+                          <div className="absolute bottom-2 left-3 flex items-center gap-2">
+                            <div className={`w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center ${form.service === s.id ? "border-violet-400 bg-violet-600" : "border-white bg-white/30"}`}>
+                              {form.service === s.id && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                            </div>
+                            <span className="font-bold text-white text-xs drop-shadow-md">{s.name}</span>
+                          </div>
+                        </div>
+                        <div className="p-3 flex-1 flex flex-col justify-between bg-white">
+                          <p className="text-gray-500 text-[11px] leading-snug">{s.desc}</p>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Coming Soon Category */}
+                <div className="border border-gray-100 bg-gray-50/50 rounded-2xl p-5 opacity-60">
+                  <div className="flex items-center gap-2 mb-3">
+                    <span className="px-2 py-0.5 text-[10px] font-bold tracking-wider uppercase bg-gray-500 text-white rounded-md">Coming Soon</span>
+                    <h4 className="font-bold text-gray-700 text-sm">Other Fabrication Services</h4>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    {[
+                      { name: "UV Printing", desc: "Full-color printing on solid objects." },
+                      { name: "Laser Cutting", desc: "Precision wood and acrylic engraving." },
+                      { name: "Engineering Services", desc: "Advanced electronics and PCB assembly." }
+                    ].map((s, idx) => (
+                      <div key={idx} className="bg-white p-3 rounded-xl border border-gray-200 text-left select-none">
+                        <p className="font-semibold text-gray-700 text-xs mb-1">{s.name}</p>
+                        <p className="text-gray-400 text-[10px] leading-tight">{s.desc}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
                 <Select
                   label="Purpose of Commission"
                   value={form.purpose}
@@ -456,7 +485,7 @@ export function ClientPortal({
                     label="Preferred Color"
                     value={form.color}
                     onChange={v => setForm({ ...form, color: v })}
-                    options={["Black", "White", "Gray", "Red", "Blue", "Green", "Multicolor", "Other"]}
+                    options={["Single Color", "Multi-Color", "Others"]}
                   />
                   <Select
                     label="Filament / Material"
@@ -465,7 +494,7 @@ export function ClientPortal({
                     options={["PLA", "ABS", "PETG", "TPU", "ASA", "Not Sure"]}
                   />
                 </div>
-                {form.color === "Other" && (
+                {form.color === "Others" && (
                   <Input
                     label="Specify Color"
                     value={form.colorOther}
@@ -475,36 +504,62 @@ export function ClientPortal({
                     error={colorOtherError}
                   />
                 )}
-                <Input
-                  label="Expected Pickup Date"
-                  type="date"
-                  value={form.expectedPickupDate}
-                  onChange={v => setForm({ ...form, expectedPickupDate: v })}
-                  placeholder=""
-                />
+                
+                <div className="flex flex-col gap-1">
+                  <label className="text-sm font-medium text-gray-700">Expected Pickup Date *</label>
+                  <Input
+                    type="date"
+                    value={form.expectedPickupDate}
+                    onChange={v => setForm({ ...form, expectedPickupDate: v })}
+                    placeholder=""
+                    required
+                  />
+                  <p className="text-xs text-amber-600/80 italic mt-0.5">
+                    “Actual completion and delivery time vary depending on design complexity, print quantity, and project requirements.”
+                  </p>
+                </div>
 
                 <Select
                   label="Pickup Option"
                   value={form.pickupOption}
                   onChange={v => setForm({ ...form, pickupOption: v })}
                   options={[
-                    "Animo Labs FabLab JGIC",
-                    "Animo Labs TBI Office Br. Andrew",
-                    "Courier",
+                    "JGIC 201 Pickup (Laguna Campus)",
+                    "Animo Labs Manila Office (Br. Andrew)",
+                    "Courier Service (Coordinate via mobile number)",
                   ]}
                 />
 
-                <Input
-                  label="Estimated Weight (grams)"
-                  type="number"
-                  value={form.weight.toString()}
-                  onChange={v => setForm({ ...form, weight: Number(v) })}
-                  placeholder="e.g. 200"
-                  required
-                />
-                {form.weight > 1000 && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-sm font-medium text-gray-700">Estimated Weight (grams)</label>
+                    <label className="flex items-center gap-1.5 cursor-pointer select-none text-xs text-gray-500 font-medium">
+                      <input
+                        type="checkbox"
+                        checked={form.isWeightNA}
+                        onChange={e => setForm({ ...form, isWeightNA: e.target.checked, weight: e.target.checked ? 0 : 200 })}
+                        className="w-3.5 h-3.5 rounded border-gray-300 text-violet-600 focus:ring-violet-400"
+                      />
+                      <span>Not sure / N/A</span>
+                    </label>
+                  </div>
+                  {!form.isWeightNA ? (
+                    <Input
+                      type="number"
+                      value={form.weight.toString()}
+                      onChange={v => setForm({ ...form, weight: Number(v) })}
+                      placeholder="e.g. 200"
+                      required
+                    />
+                  ) : (
+                    <div className="px-3 py-2 rounded-lg border border-gray-200 bg-gray-50 text-gray-500 text-sm">
+                      N/A (Weight will be estimated by Resident Maker)
+                    </div>
+                  )}
+                </div>
+                {form.weight > 1000 && !form.isWeightNA && (
                   <div className="mt-2 p-3 bg-red-50 text-red-800 border border-red-200 rounded-lg text-xs font-semibold animate-in fade-in duration-300">
-                    🚨 Bulk Order: If your 3D printing needs exceed 1kg (1000g), please email Domie James Jucutan directly at hello@animolabs.ph or domie.jucutan@dlsu.edu.ph.
+                    🚨 Bulk Order: If your 3D printing needs exceed 1kg (1000g), please email Domie James Jucutan directly at domie.jucutan@dlsu.edu.ph.
                   </div>
                 )}
 
@@ -513,17 +568,19 @@ export function ClientPortal({
                   <textarea value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} rows={3} placeholder="Dimensions, infill percentage, specific instructions..." className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm text-gray-900 bg-white outline-none focus:ring-2 focus:ring-violet-400 resize-none" />
                 </div>
 
-                <Input
-                  label="Google Drive Link (file upload link)"
-                  value={form.driveLink}
-                  onChange={v => setForm({ ...form, driveLink: v })}
-                  placeholder="https://drive.google.com/drive/folders/..."
-                  required={needsDriveLink}
-                  error={driveLinkError}
-                />
-                <p className="text-xs text-gray-500">
-                  Please ensure sharing is set to “Anyone with the link can view”.
-                </p>
+                <div className="space-y-1">
+                  <Input
+                    label="Google Drive Link (file upload link)"
+                    value={form.driveLink}
+                    onChange={v => setForm({ ...form, driveLink: v })}
+                    placeholder="https://drive.google.com/drive/folders/..."
+                    required={needsDriveLink}
+                    error={driveLinkError}
+                  />
+                  <p className="text-xs text-gray-500">
+                    Please ensure sharing is set to “Anyone with the link can view”.
+                  </p>
+                </div>
               </div>
             )}
 
@@ -537,13 +594,13 @@ export function ClientPortal({
                     <div><p className="text-gray-500 text-xs mb-1">Client Type</p><p className="font-semibold text-gray-900">{form.clientType || "—"}</p></div>
                     <div><p className="text-gray-500 text-xs mb-1">Contact Number</p><p className="font-semibold text-gray-900">{form.contactNumber || "—"}</p></div>
                     <div><p className="text-gray-500 text-xs mb-1">DLSU Client</p><p className="font-semibold text-gray-900">{form.isDlsuStudent ? "Yes" : "No"}</p></div>
-                    {(form.clientType === "Outsider" || !form.isDlsuStudent) && (
+                    {(form.clientType === "Outsider" || form.clientType === "Non-DLSU Student") && (
                       <div>
-                        <p className="text-gray-500 text-xs mb-1">Affiliation</p>
+                        <p className="text-gray-500 text-xs mb-1">Affiliation / College</p>
                         <p className="font-semibold text-gray-900">{form.affiliation || "—"}</p>
                       </div>
                     )}
-                    {form.clientType === "Student" && (
+                    {form.clientType === "DLSU Student" && (
                       <>
                         <div><p className="text-gray-500 text-xs mb-1">ID Number</p><p className="font-semibold text-gray-900">{form.idNumber || "—"}</p></div>
                         <div><p className="text-gray-500 text-xs mb-1">Program</p><p className="font-semibold text-gray-900">{form.program || "—"} ({form.college})</p></div>
@@ -554,8 +611,18 @@ export function ClientPortal({
                     )}
                     <div><p className="text-gray-500 text-xs mb-1">Service</p><p className="font-semibold text-gray-900">{form.service || "—"}</p></div>
                     <div><p className="text-gray-500 text-xs mb-1">Purpose</p><p className="font-semibold text-gray-900">{form.purpose === "Others" ? (form.purposeOther || "—") : (form.purpose || "—")}</p></div>
-                    <div><p className="text-gray-500 text-xs mb-1">Material</p><p className="font-semibold text-gray-900">{form.color} {form.filament}</p></div>
-                    <div><p className="text-gray-500 text-xs mb-1">Weight</p><p className="font-semibold text-gray-900">{form.weight} g</p></div>
+                    <div>
+                      <p className="text-gray-500 text-xs mb-1">Material</p>
+                      <p className="font-semibold text-gray-900">
+                        {form.color === "Others" ? form.colorOther : form.color} ({form.filament})
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-gray-500 text-xs mb-1">Weight</p>
+                      <p className="font-semibold text-gray-900">
+                        {form.isWeightNA ? "N/A" : `${form.weight} g`}
+                      </p>
+                    </div>
                     <div className="col-span-2"><p className="text-gray-500 text-xs mb-1">Google Drive Link</p><p className="font-semibold text-gray-900 break-all">{form.driveLink || "—"}</p></div>
                     <div><p className="text-gray-500 text-xs mb-1">Expected Pickup Date</p><p className="font-semibold text-gray-900">{form.expectedPickupDate || "—"}</p></div>
                     <div><p className="text-gray-500 text-xs mb-1">Pickup Option</p><p className="font-semibold text-gray-900">{form.pickupOption || "—"}</p></div>
@@ -596,9 +663,11 @@ export function ClientPortal({
                       </p>
                     ))}
                   </div>
-                  <div className="pt-2 border-t border-blue-200 space-y-1 text-blue-700">
+                  <div className="pt-2 border-t border-blue-200 space-y-1.5 text-blue-700">
                     <p>📧 Please refer to your registered email for additional details and pricing.</p>
-                    <p>📧 Contact <strong className="text-blue-950">domie.jucutan@dlsu.edu.ph</strong> or <strong className="text-blue-950">hello@animolabs.ph</strong> for additional concerns.</p>
+                    <p>📧 Support Email: <strong className="text-blue-950">domie.jucutan@dlsu.edu.ph</strong></p>
+                    <p>📞 Contact Number: <strong className="text-blue-950">09209540688</strong></p>
+                    <p>🌐 Facebook Page: <a href="https://www.facebook.com/animolabsph" target="_blank" rel="noopener noreferrer" className="text-blue-950 underline font-semibold hover:text-blue-900">facebook.com/animolabsph</a></p>
                   </div>
                 </div>
 
