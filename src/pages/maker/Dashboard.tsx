@@ -1,9 +1,9 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { Clock, Package, Pin } from "lucide-react";
 import { PageHeader, StatCard, StatusBadge } from "../../components/common";
-import { ANNOUNCEMENTS_DATA } from "../../constants/mockData";
 import { type Commission } from "../../services/sheetsService";
 import { type Account } from "../../services/accountsService";
+import { announcementsService, type Announcement } from "../../services/announcementsService";
 
 const WEEKLY_HOURS_TARGET = 20;
 
@@ -27,6 +27,9 @@ export function MakerDashboard({
   const firstName = account.firstName;
   const hoursThisWeek = Number(account.hoursWeek) || 0;
   const totalHours = Number(account.totalHours) || 0;
+  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+
+  useEffect(() => { announcementsService.fetchAnnouncements().then(setAnnouncements); }, []);
 
   return (
     <div className="p-6">
@@ -80,16 +83,20 @@ export function MakerDashboard({
       {/*Upcoming Announcements*/}
       <div className="bg-card rounded-xl border border-border p-5">
         <h3 className="text-sm font-semibold text-card-foreground mb-3">Upcoming Announcements</h3>
-        {ANNOUNCEMENTS_DATA.slice(0, 2).map(a => (
-          <div key={a.id} className="flex gap-3 py-2 border-b border-muted last:border-0">
-            {a.pinned && <Pin className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0 mt-0.5" />}
-            <div>
-              <p className="text-sm font-medium text-card-foreground">{a.title}</p>
-              <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{a.body}</p>
+        {announcements.length === 0 ? (
+          <p className="text-xs text-muted-foreground italic py-2">No announcements yet.</p>
+        ) : (
+          announcements.slice(0, 2).map(a => (
+            <div key={a.id} className="flex gap-3 py-2 border-b border-muted last:border-0">
+              {a.pinned && <Pin className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0 mt-0.5" />}
+              <div>
+                <p className="text-sm font-medium text-card-foreground">{a.title}</p>
+                <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{a.body}</p>
+              </div>
+              <span className="text-xs text-muted-foreground font-mono ml-auto whitespace-nowrap">{a.date}</span>
             </div>
-            <span className="text-xs text-muted-foreground font-mono ml-auto whitespace-nowrap">{a.date}</span>
-          </div>
-        ))}
+          ))
+        )}
       </div>
     </div>
   );
