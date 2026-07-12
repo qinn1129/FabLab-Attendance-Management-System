@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Plus, Pin, Trash2 } from "lucide-react";
+import { Plus, Pin, PinOff, Trash2 } from "lucide-react";
 import { PageHeader, Input } from "../../components/common";
 import { announcementsService, type Announcement } from "../../services/announcementsService";
 
@@ -9,8 +9,10 @@ export function AdminAnnouncements() {
   const [adding, setAdding] = useState(false);
   const [newTitle, setNewTitle] = useState("");
   const [newBody, setNewBody] = useState("");
+  const [newPinned, setNewPinned] = useState(false);
   const [posting, setPosting] = useState(false);
   const [postError, setPostError] = useState("");
+  const [pinningId, setPinningId] = useState<string | null>(null);
 
   const loadAnnouncements = async () => {
     setLoading(true);
@@ -26,19 +28,28 @@ export function AdminAnnouncements() {
     loadAnnouncements();
   }
 
+  async function togglePin(id: string, currentlyPinned: boolean) {
+    setPinningId(id);
+    // Optimistic update so the UI re-sorts immediately
+    setAnns(a => a.map(x => x.id === id ? { ...x, pinned: !currentlyPinned } : x));
+    await announcementsService.updateAnnouncement(id, { pinned: !currentlyPinned });
+    await loadAnnouncements();
+    setPinningId(null);
+  }
+
   async function addAnn() {
     if (!newTitle || !newBody) return;
     setPosting(true);
     setPostError("");
 
-    const saved = await announcementsService.addAnnouncement(newTitle, newBody, false);
+    const saved = await announcementsService.addAnnouncement(newTitle, newBody, newPinned);
     setAnns(a => [saved, ...a]);
 
     try {
       const res = await fetch("http://127.0.0.1:5001/api/send-announcement", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title: newTitle, body: newBody, pinned: false }),
+        body: JSON.stringify({ title: newTitle, body: newBody, pinned: newPinned }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to send emails.");
@@ -47,7 +58,7 @@ export function AdminAnnouncements() {
       setPostError(err instanceof Error ? err.message : "Failed to email Resident Makers.");
     } finally {
       setPosting(false);
-      setNewTitle(""); setNewBody(""); setAdding(false);
+      setNewTitle(""); setNewBody(""); setNewPinned(false); setAdding(false);
     }
   }
 
@@ -69,6 +80,17 @@ export function AdminAnnouncements() {
             <label className="text-sm font-medium text-foreground">Body</label>
             <textarea value={newBody} onChange={e => setNewBody(e.target.value)} rows={3} placeholder="Announcement body text..." className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm text-foreground outline-none focus:ring-2 focus:ring-emerald-400 resize-none" />
           </div>
+          <label className="flex items-center gap-2 select-none cursor-pointer">
+            <input
+              type="checkbox"
+              checked={newPinned}
+              onChange={e => setNewPinned(e.target.checked)}
+              className="w-4 h-4 rounded border-border text-emerald-600 focus:ring-emerald-400"
+            />
+            <span className="text-sm text-foreground flex items-center gap-1">
+              <Pin className="w-3.5 h-3.5 text-emerald-500" /> Pin this announcement
+            </span>
+          </label>
           {postError && <p className="text-red-500 text-sm">{postError}</p>}
           <div className="flex gap-2">
             <button onClick={addAnn} disabled={posting} className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white text-sm font-medium px-4 py-2 rounded-lg transition">
@@ -97,6 +119,18 @@ export function AdminAnnouncements() {
                   <p className="text-muted-foreground text-sm leading-relaxed">{a.body}</p>
                 </div>
                 <div className="flex gap-1.5 flex-shrink-0">
+                  <button
+                    onClick={() => togglePin(a.id, a.pinned)}
+                    disabled={pinningId === a.id}
+                    className={`flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold rounded-lg border transition disabled:opacity-40 ${
+                      a.pinned
+                        ? "bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 border-emerald-500/20"
+                        : "bg-muted hover:bg-muted/80 text-muted-foreground border-border"
+                    }`}
+                  >
+                    {a.pinned ? <PinOff className="w-3.5 h-3.5" /> : <Pin className="w-3.5 h-3.5" />}
+                    {a.pinned ? "Unpin" : "Pin"}
+                  </button>
                   <button onClick={() => bump(a.id)} className="px-2.5 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 text-xs font-semibold rounded-lg border border-emerald-500/20 transition">
                     Bump ↑
                   </button>
