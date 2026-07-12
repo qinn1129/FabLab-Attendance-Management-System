@@ -33,6 +33,12 @@ function setup_accounts() {
   getOrCreateSheet(ss, "accounts");
 }
 
+function setup_announcements() {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  getOrCreateSheet(ss, "announcements");
+}
+
+
 function getOrCreateSheet(ss, name) {
     let sheet = ss.getSheetByName(name);
     if (!sheet) {
@@ -263,6 +269,24 @@ function doPost(e) {
         const colIndex = headers.indexOf(key);
         if (colIndex > -1) sheet.getRange(rowIndex, colIndex + 1).setValue(rowData[key]);
       }
+      return jsonOut({ success: true });
+    }
+
+    if (action === "delete") {
+      const id = body.id;
+      const data = sheet.getDataRange().getValues();
+      const headers = data[0];
+      let idIndex = headers.indexOf("id");
+      if (idIndex === -1) idIndex = headers.indexOf("resident_ID");
+      if (idIndex === -1) throw new Error("No ID column found in sheet headers.");
+
+      let rowIndex = -1;
+      for (let i = 1; i < data.length; i++) {
+        if (data[i][idIndex] == id) { rowIndex = i + 1; break; }
+      }
+      if (rowIndex === -1) throw new Error("Row with ID " + id + " not found.");
+
+      sheet.deleteRow(rowIndex);
       return jsonOut({ success: true });
     }
 

@@ -4,6 +4,7 @@ import { PageHeader } from "../../components/common";
 import { ANNOUNCEMENTS_DATA, MODULES_DATA, FAQS_DATA } from "../../constants/mockData";
 import { accountsService, type Account } from "../../services/accountsService";
 import { sheetsService, type WeeklySchedule } from "../../services/sheetsService";
+import { announcementsService, type Announcement } from "../../services/announcementsService";
 
 const dayMap: Record<string, string> = {
   "Mon": "Monday",
@@ -26,6 +27,14 @@ export function MakerResources() {
   const [makers, setMakers] = useState<Account[]>([]);
   const [weeklyScheds, setWeeklyScheds] = useState<WeeklySchedule[]>([]);
   const days = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
+  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+
+useEffect(() => {
+  accountsService.fetchResidentMakers().then(setMakers);
+  sheetsService.fetchWeeklySchedules().then(setWeeklyScheds);
+  announcementsService.fetchAnnouncements().then(setAnnouncements);
+}, []);
+
 
   useEffect(() => {
     accountsService.fetchResidentMakers().then(setMakers);
@@ -85,7 +94,7 @@ export function MakerResources() {
       {/*Announcements*/}
       {tab === "announcements" && (
         <div className="space-y-3">
-          {ANNOUNCEMENTS_DATA.map(a => (
+          {announcements.map(a => (
             <div key={a.id} className={`bg-card rounded-xl border p-5 ${a.pinned ? "border-emerald-500/30" : "border-border"}`}>
               <div className="flex items-center gap-2 mb-1">
                 {a.pinned && <Pin className="w-3.5 h-3.5 text-emerald-500" />}
