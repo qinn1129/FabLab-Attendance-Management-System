@@ -14,7 +14,7 @@ GOOGLE_SCRIPT_URL = os.getenv("GOOGLE_SCRIPT_URL", "https://script.google.com/ma
 WEBAPP_SECRET = os.getenv("WEBAPP_SECRET", "7893402haefudHJFKio&%^*(#G2ghd0")
 
 SENDER_EMAIL = "roughmage33@gmail.com"
-SENDER_APP_PASSWORD = os.getenv("SENDER_APP_PASSWORD", "lbkc vyso bifa qmvk")
+SENDER_APP_PASSWORD = os.getenv("SENDER_APP_PASSWORD", "lbkc vyso bifa qmv") #k
 
 SMTP_HOST = "smtp.gmail.com"
 SMTP_PORT = 465  # SSL
