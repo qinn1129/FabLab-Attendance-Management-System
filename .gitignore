@@ -43,3 +43,9 @@ credentials.json
 # Agents
 .agents/
 
+# Python
+**/venv/
+**/__pycache__/
+*.pyc
+*.pyo
+

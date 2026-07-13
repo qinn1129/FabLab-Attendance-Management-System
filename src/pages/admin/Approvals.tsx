@@ -1,23 +1,33 @@
-import React from "react";
 import { Check, X, User, CheckCircle } from "lucide-react";
 import { PageHeader } from "../../components/common";
 import { type Commission } from "../../services/sheetsService";
+import { sendCommissionConfirmationEmail } from "../../services/emailService";
 
 /**
  * Renders the Commission Approvals view for Admins.
  * Domain: Admin
- * @returns {JSX.Element}
  */
-export function AdminApprovals({ 
-  commissions, 
-  onUpdate 
-}: { 
-  commissions: Commission[]; 
-  onUpdate: (id: string, updates: Partial<Commission>) => Promise<void>; 
+export function AdminApprovals({
+  commissions,
+  onUpdate
+}: {
+  commissions: Commission[];
+  onUpdate: (id: string, updates: Partial<Commission>) => Promise<void>;
 }) {
   const items = commissions.filter(c => c.status === "Awaiting Approval");
 
   const handleApprove = async (id: string) => {
+    // Find the commission to get client details
+    const commission = commissions.find(c => c.id === id);
+    if (commission) {
+      // Send confirmation email to client
+      await sendCommissionConfirmationEmail(
+        commission.client,
+        commission.clientEmail,
+        commission
+      );
+    }
+    // Update status to Pending
     await onUpdate(id, { status: "Pending" });
   };
 

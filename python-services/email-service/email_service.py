@@ -165,6 +165,156 @@ def send_announcement_email(
     return {"sent": len(recipients), "recipients": recipients, "failed": []}
 
 
+def _build_commission_confirmation_message(
+    client_name: str,
+    client_email: str,
+    commission_id: str,
+    service: str,
+    color: str,
+    filament: str,
+    urgency: str,
+    submitted: str,
+) -> MIMEMultipart:
+    """Build a confirmation email for a commission request."""
+    subject = f"[FabLab] Your commission request {commission_id} is confirmed"
+
+    text_body = f"""\
+Dear {client_name},
+
+Thank you for submitting your 3D printing request to Animo Labs FabLab. We're pleased to inform you that your commission request has been confirmed and is now being processed.
+
+Request Details:
+- Commission ID: {commission_id}
+- Service: {service}
+- Material: {color} {filament}
+- Urgency: {urgency}
+- Submitted: {submitted}
+
+Your request is now in our fabrication queue. A Resident Maker will be assigned to your project shortly.
+
+You will receive updates as your commission progresses through the workflow.
+
+Thank you for choosing Animo Labs FabLab!
+
+— Animo Labs FabLab
+This is an automated notification. Please do not reply to this email.
+"""
+
+    html_body = f"""\
+<html>
+  <body style="font-family: 'Inter', Arial, sans-serif; background:#f8f9fb; padding:24px;">
+    <div style="max-width:560px;margin:0 auto;background:#ffffff;border-radius:16px;
+                border:1px solid #eceef2;overflow:hidden;">
+      <div style="background:#064e3b;padding:20px 28px;">
+        <p style="color:#ecfdf5;font-size:13px;letter-spacing:.05em;text-transform:uppercase;
+                  margin:0;font-family:monospace;">Animo Labs FabLab</p>
+        <p style="color:#ffffff;font-size:18px;font-weight:700;margin:4px 0 0;">
+          Commission Request Confirmed
+        </p>
+      </div>
+      <div style="padding:28px;">
+        <p style="color:#333;font-size:14px;line-height:1.6;">
+          Dear {client_name},
+        </p>
+
+        <p style="color:#333;font-size:14px;line-height:1.6;">
+          Thank you for submitting your 3D printing request. We're pleased to inform you that your commission request has been <strong>confirmed</strong> and is now being processed.
+        </p>
+
+        <div style="background:#f1f0f6;border-radius:8px;padding:20px;margin:20px 0;">
+          <p style="color:#0f0f14;font-size:14px;margin:0 0 8px;"><strong>Request Details:</strong></p>
+          <p style="color:#333;font-size:13px;margin:4px 0;"><span style="color:#6b6b80;">Commission ID:</span> <span style="font-family:monospace;color:#059669;">{commission_id}</span></p>
+          <p style="color:#333;font-size:13px;margin:4px 0;"><span style="color:#6b6b80;">Service:</span> {service}</p>
+          <p style="color:#333;font-size:13px;margin:4px 0;"><span style="color:#6b6b80;">Material:</span> {color} {filament}</p>
+          <p style="color:#333;font-size:13px;margin:4px 0;"><span style="color:#6b6b80;">Urgency:</span> {urgency}</p>
+          <p style="color:#333;font-size:13px;margin:4px 0;"><span style="color:#6b6b80;">Submitted:</span> {submitted}</p>
+        </div>
+
+        <p style="color:#333;font-size:14px;line-height:1.6;">
+          Your request is now in our fabrication queue. A Resident Maker will be assigned to your project shortly.
+        </p>
+
+        <p style="color:#333;font-size:14px;line-height:1.6;">
+          You will receive updates as your commission progresses through the workflow.
+        </p>
+
+        <p style="color:#333;font-size:14px;line-height:1.6;margin-top:20px;">
+          Thank you for choosing Animo Labs FabLab!
+        </p>
+      </div>
+      <div style="padding:16px 28px;background:#f1f0f6;color:#6b6b80;font-size:12px;">
+        This is an automated notification from the Resident Maker Management System.
+        Please do not reply to this email.
+      </div>
+    </div>
+  </body>
+</html>
+"""
+
+    message = MIMEMultipart("alternative")
+    message["Subject"] = subject
+    message["From"] = f"Animo Labs FabLab <{SENDER_EMAIL}>"
+    message["To"] = client_email
+    message.attach(MIMEText(text_body, "plain"))
+    message.attach(MIMEText(html_body, "html"))
+    return message
+
+
+def send_commission_confirmation_email(
+    client_name: str,
+    client_email: str,
+    commission: Dict,
+) -> Dict:
+    """
+    Sends a confirmation email to a client when their commission request is approved.
+
+    Returns: {"sent": bool, "recipients": [...], "failed": [...], "note"?: str}
+    """
+    if not SENDER_APP_PASSWORD:
+        raise EmailServiceError(
+            "SENDER_APP_PASSWORD is not set. Generate a Gmail App Password at "
+            "https://myaccount.google.com/apppasswords for roughmage33@gmail.com "
+            "and put it in .env."
+        )
+
+    # Extract commission details with fallbacks for optional fields
+    commission_id = commission.get("id", "Unknown")
+    service = commission.get("service", "Unknown Service")
+    color = commission.get("color", "Unknown")
+    filament = commission.get("filament", "Unknown")
+    urgency = commission.get("urgency", "Standard (3-5 days)")
+    submitted = commission.get("submitted", "Unknown")
+
+    if not client_email:
+        return {
+            "sent": False,
+            "recipients": [],
+            "failed": [],
+            "note": "No client email provided.",
+        }
+
+    message = _build_commission_confirmation_message(
+        client_name=client_name,
+        client_email=client_email,
+        commission_id=commission_id,
+        service=service,
+        color=color,
+        filament=filament,
+        urgency=urgency,
+        submitted=submitted,
+    )
+
+    context = ssl.create_default_context()
+    try:
+        with smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT, context=context) as server:
+            server.login(SENDER_EMAIL, SENDER_APP_PASSWORD)
+            server.sendmail(SENDER_EMAIL, [client_email], message.as_string())
+    except smtplib.SMTPException as exc:
+        raise EmailServiceError(f"Failed to send confirmation email: {exc}") from exc
+
+    return {"sent": True, "recipients": [client_email], "failed": []}
+
+
 def _cli():
     import argparse
 
