@@ -53,6 +53,11 @@ function setup_chat() {
   getOrCreateSheet(ss, "chat");
 }
 
+function setup_attendanceLogs() {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  getOrCreateSheet(ss, "attendanceLogs");
+}
+
 function getOrCreateSheet(ss, name) {
     let sheet = ss.getSheetByName(name);
     if (!sheet) {
@@ -86,6 +91,9 @@ function getOrCreateSheet(ss, name) {
             sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
         } else if (name === "chat") {
             const headers = ["id", "sender", "role", "text", "createdAt"];
+            sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+        } else if (name === "attendanceLogs") {
+            const headers = ["id", "resident_id", "clock_in_timestamp", "clock_out_timestamp", "total_hours", "status"];
             sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
         }
     }

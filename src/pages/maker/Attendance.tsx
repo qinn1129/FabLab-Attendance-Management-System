@@ -3,7 +3,7 @@ import { Clock, AlertTriangle, Calendar, Save, Trash2, Check } from "lucide-reac
 import { PageHeader, Select, Input } from "../../components/common";
 import { cn } from "../../lib/utils";
 import { accountsService, parseScheduleDays, stringifyScheduleDays, type Account } from "../../services/accountsService";
-import { sheetsService } from "../../services/sheetsService";
+import { sheetsService, type AttendanceLog } from "../../services/sheetsService";
 
 const dayMap: Record<string, string> = {
   "Mon": "Monday",
@@ -129,9 +129,179 @@ export function MakerAttendance({
   account: Account;
   onAccountUpdate: (account: Account) => void;
 }) {
-  const [clockedIn, setClockedIn] = useState(true);
-  const [clockInTime] = useState("9:58 AM");
+  const [clockedIn, setClockedIn] = useState(false);
+  const [activeSession, setActiveSession] = useState<AttendanceLog | null>(null);
+  const [loadingSession, setLoadingSession] = useState(false);
+  const [currentTime, setCurrentTime] = useState(new Date());
   const [tab, setTab] = useState<"clock"|"schedule"|"request">("clock");
+
+  // Load and check active session on mount
+  useEffect(() => {
+    let isMounted = true;
+    
+    const checkActiveSession = async () => {
+      setLoadingSession(true);
+      try {
+        const logs = await sheetsService.fetchAttendanceLogs();
+        if (!isMounted) return;
+        const myLogs = logs.filter(log => log.resident_id === account.id);
+        const active = myLogs.find(log => log.status === "Active" || !log.clock_out_timestamp);
+        
+        if (active) {
+          const clockInDate = new Date(active.clock_in_timestamp);
+          const now = new Date();
+          const isDiffDay = clockInDate.getFullYear() !== now.getFullYear() ||
+                            clockInDate.getMonth() !== now.getMonth() ||
+                            clockInDate.getDate() !== now.getDate();
+          
+          if (isDiffDay) {
+            // Day ended and they didn't clock out, invalidate session
+            await sheetsService.updateAttendanceLog(active.id, {
+              status: "Invalid",
+              total_hours: 0
+            });
+            if (isMounted) {
+              setActiveSession(null);
+              setClockedIn(false);
+            }
+          } else {
+            if (isMounted) {
+              setActiveSession(active);
+              setClockedIn(true);
+            }
+          }
+        } else {
+          if (isMounted) {
+            setActiveSession(null);
+            setClockedIn(false);
+          }
+        }
+      } catch (err) {
+        console.error("Error loading active session", err);
+      } finally {
+        if (isMounted) {
+          setLoadingSession(false);
+        }
+      }
+    };
+
+    checkActiveSession();
+    return () => {
+      isMounted = false;
+    };
+  }, [account.id]);
+
+  // Live dynamic clock and end-of-day invalidation check
+  useEffect(() => {
+    const timer = setInterval(() => {
+      const now = new Date();
+      setCurrentTime(now);
+      
+      // If there is an active session, check if the day changed in real-time
+      if (activeSession) {
+        const clockInDate = new Date(activeSession.clock_in_timestamp);
+        const isDiffDay = clockInDate.getFullYear() !== now.getFullYear() ||
+                          clockInDate.getMonth() !== now.getMonth() ||
+                          clockInDate.getDate() !== now.getDate();
+        if (isDiffDay) {
+          // day ended, invalidate active session
+          sheetsService.updateAttendanceLog(activeSession.id, {
+            status: "Invalid",
+            total_hours: 0
+          }).then(() => {
+            setActiveSession(null);
+            setClockedIn(false);
+          }).catch(console.error);
+        }
+      }
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [activeSession]);
+
+  const getSessionDuration = () => {
+    if (!activeSession) return "0h 0m";
+    const start = new Date(activeSession.clock_in_timestamp);
+    const diffMs = currentTime.getTime() - start.getTime();
+    if (diffMs < 0) return "0h 0m";
+    const diffMins = Math.floor(diffMs / (1000 * 60));
+    const hrs = Math.floor(diffMins / 60);
+    const mins = diffMins % 60;
+    return `${hrs}h ${mins}m`;
+  };
+
+  const handleClockIn = async () => {
+    setLoadingSession(true);
+    const now = new Date();
+    const newLog: AttendanceLog = {
+      id: "ATT-" + now.getTime(),
+      resident_id: account.id,
+      clock_in_timestamp: now.toISOString(),
+      clock_out_timestamp: "",
+      total_hours: 0,
+      status: "Active"
+    };
+    try {
+      await sheetsService.addAttendanceLog(newLog);
+      setActiveSession(newLog);
+      setClockedIn(true);
+    } catch (err) {
+      console.error("Error clocking in:", err);
+      alert("Failed to clock in. Please try again.");
+    } finally {
+      setLoadingSession(false);
+    }
+  };
+
+  const handleClockOut = async () => {
+    if (!activeSession) return;
+    setLoadingSession(true);
+    const now = new Date();
+    const start = new Date(activeSession.clock_in_timestamp);
+    const diffMs = now.getTime() - start.getTime();
+    const diffHrs = Math.max(0, Math.round((diffMs / (1000 * 60 * 60)) * 100) / 100);
+    
+    try {
+      // 1. Update attendance log
+      await sheetsService.updateAttendanceLog(activeSession.id, {
+        clock_out_timestamp: now.toISOString(),
+        total_hours: diffHrs,
+        status: "Completed"
+      });
+      
+      // 2. Update account totalHours and hoursWeek
+      const currentTotal = Number(account.totalHours) || 0;
+      const currentWeek = Number(account.hoursWeek) || 0;
+      const updatedTotal = Math.round((currentTotal + diffHrs) * 100) / 100;
+      const updatedWeek = Math.round((currentWeek + diffHrs) * 100) / 100;
+      
+      const accountUpdates = {
+        totalHours: updatedTotal,
+        hoursWeek: updatedWeek
+      };
+      
+      const result = await accountsService.updateAccount(account.id, accountUpdates);
+      if (result.success) {
+        onAccountUpdate({
+          ...account,
+          ...accountUpdates
+        });
+      } else {
+        console.warn("Failed to update account total hours in sheets:", result.error);
+        onAccountUpdate({
+          ...account,
+          ...accountUpdates
+        });
+      }
+      
+      setActiveSession(null);
+      setClockedIn(false);
+    } catch (err) {
+      console.error("Error clocking out:", err);
+      alert("Failed to clock out. Please try again.");
+    } finally {
+      setLoadingSession(false);
+    }
+  };
   const [schedDays, setSchedDays] = useState<string[]>(parseScheduleDays(account.schedule));
   const [savingSchedule, setSavingSchedule] = useState(false);
   const [scheduleSaved, setScheduleSaved] = useState("");
@@ -248,9 +418,7 @@ export function MakerAttendance({
     setSelectedSlots({});
   };
 
-  const handleClockToggle = () => {
-    setClockedIn(o => !o);
-  };
+  // Removed static toggle in favor of real sheets service actions
 
   const saveSchedule = async () => {
     setSavingSchedule(true);
@@ -286,25 +454,34 @@ export function MakerAttendance({
 
       {tab === "clock" && (
         <div className="max-w-sm">
-          <div className="bg-card rounded-2xl border border-border p-8 text-center mb-4">
-            <div className={cn("w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-4 transition-all", clockedIn ? "bg-emerald-500/20 ring-4 ring-emerald-500/30" : "bg-muted")}>
+          <div className="bg-card rounded-2xl border border-border p-8 text-center mb-4 animate-fade-in">
+            <div className={cn("w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-4 transition-all", clockedIn ? "bg-emerald-500/20 ring-4 ring-emerald-500/30 animate-pulse" : "bg-muted")}>
               <Clock className={cn("w-12 h-12", clockedIn ? "text-emerald-500" : "text-muted-foreground")} />
             </div>
-            <p className="text-2xl font-bold text-foreground mb-1 font-mono">
-              {new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+            <p className="text-3xl font-bold text-foreground mb-1 font-mono tracking-wider">
+              {currentTime.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
             </p>
-            <p className="text-muted-foreground text-sm mb-1">{new Date().toDateString()}</p>
-            {clockedIn && <p className="text-emerald-500 text-sm font-medium">Clocked in at {clockInTime}</p>}
+            <p className="text-muted-foreground text-sm mb-2">{currentTime.toLocaleDateString([], { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
+            {clockedIn && activeSession && (
+              <p className="text-emerald-500 text-sm font-medium bg-emerald-500/10 px-3 py-1 rounded-full w-fit mx-auto mt-2 border border-emerald-500/20">
+                Clocked in at {new Date(activeSession.clock_in_timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+              </p>
+            )}
           </div>
           <button
-            onClick={handleClockToggle}
-            className={cn("w-full py-4 rounded-xl font-bold text-lg transition", clockedIn ? "bg-red-500 hover:bg-red-600 text-white" : "bg-emerald-600 hover:bg-emerald-700 text-white")}
+            onClick={clockedIn ? handleClockOut : handleClockIn}
+            disabled={loadingSession}
+            className={cn(
+              "w-full py-4 rounded-xl font-bold text-lg transition flex items-center justify-center gap-2", 
+              clockedIn ? "bg-red-500 hover:bg-red-600 text-white" : "bg-emerald-600 hover:bg-emerald-700 text-white",
+              loadingSession && "opacity-50 cursor-not-allowed"
+            )}
           >
-            {clockedIn ? "⏹ Clock Out" : "▶ Clock In"}
+            {loadingSession ? "Processing..." : clockedIn ? "⏹ Clock Out" : "▶ Clock In"}
           </button>
-          {clockedIn && (
-            <div className="mt-3 bg-emerald-500/10 rounded-xl border border-emerald-500/20 p-3 text-center">
-              <p className="text-emerald-600 text-sm">Current session: <strong className="font-mono">5h 42m</strong></p>
+          {clockedIn && activeSession && (
+            <div className="mt-3 bg-emerald-500/10 rounded-xl border border-emerald-500/20 p-3 text-center animate-fade-in">
+              <p className="text-emerald-600 text-sm">Current session: <strong className="font-mono">{getSessionDuration()}</strong></p>
             </div>
           )}
         </div>

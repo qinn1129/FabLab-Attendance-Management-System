@@ -12,6 +12,15 @@ export interface WeeklySchedule {
   [key: string]: string | undefined;
 }
 
+export interface AttendanceLog {
+  id: string;
+  resident_id: string;
+  clock_in_timestamp: string;
+  clock_out_timestamp: string;
+  total_hours: number;
+  status: "Active" | "Completed" | "Invalid";
+}
+
 export interface Commission {
   id: string;
   client: string;
@@ -366,6 +375,143 @@ export const sheetsService = {
         });
       }
       localStorage.setItem("fablab_weekly_schedules_v1", JSON.stringify(scheds));
+    }
+  },
+
+  /**
+   * Fetches all attendance logs.
+   */
+  async fetchAttendanceLogs(): Promise<AttendanceLog[]> {
+    const url = getScriptUrl();
+    if (!url) {
+      console.log(
+        "[sheetsService] No VITE_GOOGLE_SCRIPT_URL found. Using localStorage fallback for attendance logs.",
+      );
+      const existing = localStorage.getItem("fablab_attendance_logs_v1");
+      return existing ? JSON.parse(existing) : [];
+    }
+
+    try {
+      const secret = import.meta.env.VITE_WEBAPP_SECRET || "";
+      const fetchUrl = `${url}${url.includes("?") ? "&" : "?"}secret=${encodeURIComponent(secret)}&sheet=attendanceLogs`;
+      const response = await fetch(fetchUrl);
+      if (!response.ok)
+        throw new Error(`HTTP error! status: ${response.status}`);
+      const data = await response.json();
+      if (data.error) throw new Error(data.error);
+      return data.map((item: any) => ({
+        ...item,
+        total_hours: Number(item.total_hours) || 0,
+      })) as AttendanceLog[];
+    } catch (error) {
+      console.error(
+        "[sheetsService] Failed to fetch attendance logs from Google Sheets. Falling back to localStorage.",
+        error,
+      );
+      const existing = localStorage.getItem("fablab_attendance_logs_v1");
+      return existing ? JSON.parse(existing) : [];
+    }
+  },
+
+  /**
+   * Adds a new attendance log.
+   */
+  async addAttendanceLog(log: AttendanceLog): Promise<AttendanceLog> {
+    const url = getScriptUrl();
+    if (!url) {
+      const existing = localStorage.getItem("fablab_attendance_logs_v1");
+      const logs: AttendanceLog[] = existing ? JSON.parse(existing) : [];
+      logs.push(log);
+      localStorage.setItem("fablab_attendance_logs_v1", JSON.stringify(logs));
+      return log;
+    }
+
+    try {
+      const secret = import.meta.env.VITE_WEBAPP_SECRET || "";
+      const fetchUrl = `${url}${url.includes("?") ? "&" : "?"}secret=${encodeURIComponent(secret)}&sheet=attendanceLogs`;
+      await fetch(fetchUrl, {
+        method: "POST",
+        mode: "no-cors",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify({
+          secret,
+          sheet: "attendanceLogs",
+          action: "add",
+          data: log,
+        }),
+      });
+
+      // Update local storage too so offline sync / fallback is populated
+      const existing = localStorage.getItem("fablab_attendance_logs_v1");
+      const logs: AttendanceLog[] = existing ? JSON.parse(existing) : [];
+      logs.push(log);
+      localStorage.setItem("fablab_attendance_logs_v1", JSON.stringify(logs));
+      return log;
+    } catch (error) {
+      console.error(
+        "[sheetsService] Failed to add attendance log to Google Sheets. Saving to localStorage.",
+        error,
+      );
+      const existing = localStorage.getItem("fablab_attendance_logs_v1");
+      const logs: AttendanceLog[] = existing ? JSON.parse(existing) : [];
+      logs.push(log);
+      localStorage.setItem("fablab_attendance_logs_v1", JSON.stringify(logs));
+      return log;
+    }
+  },
+
+  /**
+   * Updates an existing attendance log.
+   */
+  async updateAttendanceLog(id: string, updates: Partial<AttendanceLog>): Promise<void> {
+    const url = getScriptUrl();
+    if (!url) {
+      const existing = localStorage.getItem("fablab_attendance_logs_v1");
+      const logs: AttendanceLog[] = existing ? JSON.parse(existing) : [];
+      const idx = logs.findIndex((l) => l.id === id);
+      if (idx > -1) {
+        logs[idx] = { ...logs[idx], ...updates };
+        localStorage.setItem("fablab_attendance_logs_v1", JSON.stringify(logs));
+      }
+      return;
+    }
+
+    try {
+      const secret = import.meta.env.VITE_WEBAPP_SECRET || "";
+      const fetchUrl = `${url}${url.includes("?") ? "&" : "?"}secret=${encodeURIComponent(secret)}&sheet=attendanceLogs`;
+      await fetch(fetchUrl, {
+        method: "POST",
+        mode: "no-cors",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify({
+          secret,
+          sheet: "attendanceLogs",
+          action: "update",
+          id,
+          data: updates,
+        }),
+      });
+
+      // Also update local storage cache
+      const existing = localStorage.getItem("fablab_attendance_logs_v1");
+      const logs: AttendanceLog[] = existing ? JSON.parse(existing) : [];
+      const idx = logs.findIndex((l) => l.id === id);
+      if (idx > -1) {
+        logs[idx] = { ...logs[idx], ...updates };
+        localStorage.setItem("fablab_attendance_logs_v1", JSON.stringify(logs));
+      }
+    } catch (error) {
+      console.error(
+        "[sheetsService] Failed to update attendance log in Google Sheets. Saving to localStorage.",
+        error,
+      );
+      const existing = localStorage.getItem("fablab_attendance_logs_v1");
+      const logs: AttendanceLog[] = existing ? JSON.parse(existing) : [];
+      const idx = logs.findIndex((l) => l.id === id);
+      if (idx > -1) {
+        logs[idx] = { ...logs[idx], ...updates };
+        localStorage.setItem("fablab_attendance_logs_v1", JSON.stringify(logs));
+      }
     }
   },
 };
