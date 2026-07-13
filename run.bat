@@ -6,18 +6,18 @@ call npm install
 
 echo.
 echo Installing Python dependencies for the email service (if any are missing)...
-pip install -r email-service\requirements.txt
+pip install -r python-services/email-service/requirements.txt
 
 echo.
-if not exist email-service\.env (
-	echo [WARNING] email-service\.env not found. Copy email-service\.env.example to
-	echo           email-service\.env and fill in GOOGLE_SCRIPT_URL, WEBAPP_SECRET,
+if not exist python-services/email-service\.env (
+	echo [WARNING] python-services/email-service\.env not found. Copy python-services/email-service\.env.example to
+	echo           python-services/email-service\.env and fill in GOOGLE_SCRIPT_URL, WEBAPP_SECRET,
 	echo           and SENDER_APP_PASSWORD before announcement emails will work.
 	echo.
 )
 
 echo Starting the email service (http://127.0.0.1:5001)...
-start "FabLab Email Service" cmd /k "cd email-service && python app.py"
+start "FabLab Email Service" cmd /k "cd python-services/email-service && python app.py"
 
 echo Waiting for the email service to come online...
 set EMAIL_SERVICE_UP=0

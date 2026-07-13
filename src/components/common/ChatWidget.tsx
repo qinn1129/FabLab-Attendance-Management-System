@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
-import { X, Send, MessageCircle, MessageSquare } from "lucide-react";
+import { X, Send, MessageCircle, MessageSquare, Megaphone } from "lucide-react";
 import { chatService, type ChatMessage } from "../../services/chatService";
 import { accountsService } from "../../services/accountsService";
 import { cn } from "../../lib/utils";
@@ -15,13 +15,14 @@ interface ChatWidgetProps {
   senderRole: "Admin" | "ResidentMaker";
 }
 
-interface MentionableUser {
+interface MentionSuggestion {
   name: string;
-  role: "Admin" | "ResidentMaker";
+  kind: "Admin" | "ResidentMaker" | "Everyone";
 }
 
 const POLL_INTERVAL_MS = 4000;
 const MAX_MENTION_RESULTS = 6;
+const EVERYONE_TOKEN = "everyone";
 
 function initialsFor(name: string | undefined | null): string {
   const safe = (name || "").trim();
@@ -48,7 +49,9 @@ function escapeRegExp(s: string): string {
  * A floating chat widget used across Admin and RM interfaces for team communication.
  * Backed by the shared "chat" sheet via chatService, so messages persist across
  * reloads and are visible to everyone using the app. Supports "@" mentions that
- * autocomplete against all active Admin and Resident Maker accounts.
+ * autocomplete against all active Admin and Resident Maker accounts, plus a
+ * special "@everyone" broadcast mention. Plays a distinct notification chime
+ * for personal mentions vs. @everyone broadcasts.
  * @param {ChatWidgetProps} props
  * @returns {JSX.Element}
  */
@@ -63,21 +66,104 @@ export function ChatWidget({ accentColor = "emerald", senderName, senderRole }: 
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // ── @mention state ─────────────────────────────────────────────
-  const [mentionableUsers, setMentionableUsers] = useState<MentionableUser[]>([]);
+  const [mentionableUsers, setMentionableUsers] = useState<{ name: string; role: "Admin" | "ResidentMaker" }[]>([]);
   const [mentionOpen, setMentionOpen] = useState(false);
   const [mentionQuery, setMentionQuery] = useState("");
   const [mentionStart, setMentionStart] = useState<number | null>(null);
   const [activeMentionIndex, setActiveMentionIndex] = useState(0);
 
+  // ── notification sound state ───────────────────────────────────
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const knownIdsRef = useRef<Set<string> | null>(null); // null = first load hasn't happened yet
+
+  const ensureAudioContext = useCallback((): AudioContext | null => {
+    if (typeof window === "undefined") return null;
+    const AudioCtor = window.AudioContext || (window as any).webkitAudioContext;
+    if (!AudioCtor) return null;
+    if (!audioCtxRef.current) {
+      audioCtxRef.current = new AudioCtor();
+    }
+    return audioCtxRef.current;
+  }, []);
+
+  // Browsers block audio until a user gesture has occurred on the page.
+  // This unlocks the AudioContext on the first click/keypress so sounds
+  // aren't silently swallowed later when a real notification fires.
+  useEffect(() => {
+    const unlock = () => {
+      const ctx = ensureAudioContext();
+      if (ctx && ctx.state === "suspended") ctx.resume();
+    };
+    window.addEventListener("pointerdown", unlock, { once: true });
+    window.addEventListener("keydown", unlock, { once: true });
+    return () => {
+      window.removeEventListener("pointerdown", unlock);
+      window.removeEventListener("keydown", unlock);
+    };
+  }, [ensureAudioContext]);
+
+  /** Plays a short sequence of tones. Each entry in `frequencies` is one note. */
+  const playTones = useCallback((frequencies: number[], noteDurationMs = 130, gapMs = 35) => {
+    const ctx = ensureAudioContext();
+    if (!ctx) return;
+    let t = ctx.currentTime;
+    frequencies.forEach(freq => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = "sine";
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0.0001, t);
+      gain.gain.exponentialRampToValueAtTime(0.22, t + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t + noteDurationMs / 1000);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(t);
+      osc.stop(t + noteDurationMs / 1000 + 0.03);
+      t += (noteDurationMs + gapMs) / 1000;
+    });
+  }, [ensureAudioContext]);
+
+  /** Single clear beep — someone mentioned you personally. */
+  const playMentionSound = useCallback(() => playTones([880], 150), [playTones]);
+
+  /** Two-tone ascending chime — an @everyone broadcast, meant to stand out more. */
+  const playEveryoneSound = useCallback(() => playTones([660, 990, 1320], 110, 25), [playTones]);
+
   const loadMessages = useCallback(async () => {
     const data = await chatService.fetchMessages();
+
+    if (knownIdsRef.current === null) {
+      // First load ever: just record what's already there. Never play sounds
+      // for pre-existing history.
+      knownIdsRef.current = new Set(data.map(m => m.id));
+    } else {
+      const newOnes = data.filter(m => !knownIdsRef.current!.has(m.id));
+      if (newOnes.length > 0) {
+        const mentionPattern = new RegExp(`@${escapeRegExp(safeSenderName)}(?![a-zA-Z0-9])`, "i");
+        let sawEveryone = false;
+        let sawMention = false;
+        for (const m of newOnes) {
+          if (m.sender === safeSenderName) continue; // never notify on your own messages
+          const lower = m.text.toLowerCase();
+          if (lower.includes(`@${EVERYONE_TOKEN}`)) {
+            sawEveryone = true;
+          } else if (mentionPattern.test(m.text)) {
+            sawMention = true;
+          }
+        }
+        if (sawEveryone) playEveryoneSound();
+        else if (sawMention) playMentionSound();
+      }
+      knownIdsRef.current = new Set(data.map(m => m.id));
+    }
+
     setMsgs(data);
-  }, []);
+  }, [safeSenderName, playEveryoneSound, playMentionSound]);
 
   // Load the mentionable roster (active Admins + Resident Makers) once on mount.
   useEffect(() => {
     accountsService.fetchAccounts().then(accounts => {
-      const users: MentionableUser[] = accounts
+      const users = accounts
         .filter(a => a.status === "Active" && (a.role === "Admin" || a.role === "ResidentMaker"))
         .map(a => ({ name: `${a.firstName} ${a.lastName}`.trim(), role: a.role }))
         .filter(u => u.name.length > 0);
@@ -85,7 +171,8 @@ export function ChatWidget({ accentColor = "emerald", senderName, senderRole }: 
     });
   }, []);
 
-  // Initial load so unread messages are visible even before opening the widget.
+  // Initial load so unread messages/notifications are captured even before
+  // opening the widget.
   useEffect(() => {
     loadMessages();
   }, [loadMessages]);
@@ -116,9 +203,16 @@ export function ChatWidget({ accentColor = "emerald", senderName, senderRole }: 
     setActiveMentionIndex(0);
   }, [mentionQuery]);
 
-  const filteredMentions = mentionableUsers
-    .filter(u => u.name.toLowerCase().includes(mentionQuery.toLowerCase()))
-    .slice(0, MAX_MENTION_RESULTS);
+  // "@everyone" is offered as a synthetic top suggestion whenever the query
+  // could still be typing toward it, alongside real user matches.
+  const filteredMentions: MentionSuggestion[] = [
+    ...(EVERYONE_TOKEN.startsWith(mentionQuery.toLowerCase())
+      ? [{ name: EVERYONE_TOKEN, kind: "Everyone" as const }]
+      : []),
+    ...mentionableUsers
+      .filter(u => u.name.toLowerCase().includes(mentionQuery.toLowerCase()))
+      .map(u => ({ name: u.name, kind: u.role })),
+  ].slice(0, MAX_MENTION_RESULTS);
 
   function closeMentionMenu() {
     setMentionOpen(false);
@@ -205,17 +299,23 @@ export function ChatWidget({ accentColor = "emerald", senderName, senderRole }: 
       text,
       createdAt: new Date().toISOString(),
     };
+    // Register this message's id up front so our own optimistic/echoed
+    // message never gets treated as "new" and re-triggers a notification.
+    if (knownIdsRef.current) knownIdsRef.current.add(optimistic.id);
     setMsgs(m => [...m, optimistic]);
 
     const saved = await chatService.sendMessage(safeSenderName, senderRole, text);
+    if (knownIdsRef.current) knownIdsRef.current.add(saved.id);
     setMsgs(m => m.map(x => (x.id === optimistic.id ? saved : x)));
     setSending(false);
   }
 
-  /** Renders message text with any "@Name" mentions matching a known user highlighted. */
+  /** Renders message text with "@everyone" and any "@Name" mentions matching a known user highlighted. */
   function renderMessageText(text: string, mine: boolean): React.ReactNode {
-    if (mentionableUsers.length === 0) return text;
-    const pattern = new RegExp(`@(${mentionableUsers.map(u => escapeRegExp(u.name)).join("|")})`, "g");
+    const userNames = mentionableUsers.map(u => escapeRegExp(u.name));
+    const patternParts = [EVERYONE_TOKEN, ...userNames];
+    const pattern = new RegExp(`@(${patternParts.join("|")})`, "gi");
+
     const nodes: React.ReactNode[] = [];
     let lastIndex = 0;
     let match: RegExpExecArray | null;
@@ -223,12 +323,15 @@ export function ChatWidget({ accentColor = "emerald", senderName, senderRole }: 
 
     while ((match = pattern.exec(text)) !== null) {
       if (match.index > lastIndex) nodes.push(text.slice(lastIndex, match.index));
+      const isEveryone = match[1].toLowerCase() === EVERYONE_TOKEN;
       nodes.push(
         <span
           key={key++}
           className={cn(
             "font-semibold rounded px-0.5",
-            mine ? "bg-white/20" : "bg-emerald-500/15 text-emerald-600"
+            isEveryone
+              ? "bg-amber-500/20 text-amber-600"
+              : mine ? "bg-white/20" : "bg-emerald-500/15 text-emerald-600"
           )}
         >
           @{match[1]}
@@ -298,11 +401,21 @@ export function ChatWidget({ accentColor = "emerald", senderName, senderRole }: 
                       i === activeMentionIndex ? "bg-muted" : "hover:bg-muted/60"
                     )}
                   >
-                    <span className={cn("w-6 h-6 rounded-full flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0", u.role === "Admin" ? "bg-emerald-600" : "bg-blue-500")}>
-                      {initialsFor(u.name)}
+                    {u.kind === "Everyone" ? (
+                      <span className="w-6 h-6 rounded-full flex items-center justify-center bg-amber-500 text-white flex-shrink-0">
+                        <Megaphone className="w-3.5 h-3.5" />
+                      </span>
+                    ) : (
+                      <span className={cn("w-6 h-6 rounded-full flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0", u.kind === "Admin" ? "bg-emerald-600" : "bg-blue-500")}>
+                        {initialsFor(u.name)}
+                      </span>
+                    )}
+                    <span className="flex-1 truncate text-foreground">
+                      {u.kind === "Everyone" ? "everyone" : u.name}
                     </span>
-                    <span className="flex-1 truncate text-foreground">{u.name}</span>
-                    <span className="text-[10px] text-muted-foreground flex-shrink-0">{u.role === "Admin" ? "Admin" : "RM"}</span>
+                    <span className="text-[10px] text-muted-foreground flex-shrink-0">
+                      {u.kind === "Everyone" ? "Notify all" : u.kind === "Admin" ? "Admin" : "RM"}
+                    </span>
                   </button>
                 ))}
               </div>
