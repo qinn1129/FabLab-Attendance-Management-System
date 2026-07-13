@@ -7,6 +7,7 @@ import { TestimonialsSection } from "../../components/client/TestimonialsSection
 import { ProgressBar } from "../../components/client/ProgressBar";
 import { Input, Select } from "../../components/common";
 import { sheetsService, type Commission } from "../../services/sheetsService";
+import { sendAdminNotificationEmail, sendClientQueueNotificationEmail } from "../../services/emailService";
 
 /**
  * Root component for the Client domain. Handles the landing page and the multi-step commission request form.
@@ -137,6 +138,8 @@ export function ClientPortal({
       const nextIdNum = maxIdNum + 1;
       const nextId = `COM-${nextIdNum.toString().padStart(3, "0")}`;
 
+      const submittedDate = new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" });
+
       const newCommission = {
         id: nextId,
         client: form.name,
@@ -161,10 +164,30 @@ export function ClientPortal({
         notes: form.notes,
         file: "N/A (Drive link provided)",
         driveLink: form.driveLink,
-        submitted: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" })
+        submitted: submittedDate
       };
 
       await onAdd(newCommission);
+
+      // Send admin notification email
+      await sendAdminNotificationEmail(
+        form.name,
+        form.email,
+        form.clientType,
+        nextId,
+        form.service,
+        submittedDate
+      );
+
+      // Send client queue notification email
+      await sendClientQueueNotificationEmail(
+        form.name,
+        form.email,
+        nextId,
+        form.service,
+        submittedDate
+      );
+
       setMockLogs([
         `📧 Client Receipt: Confirmation email sent to ${form.email} for your "${form.service}" request.`,
         `📧 System Dispatch: Admin queue notified of new "${form.service}" commission from ${form.name}. ID: ${nextId}.`
