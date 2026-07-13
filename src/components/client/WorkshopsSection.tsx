@@ -6,12 +6,17 @@ import React from "react";
  * @returns {JSX.Element}
  */
 export function WorkshopsSection() {
+  const workshopsLink = import.meta.env.VITE_WORKSHOPS_BOOKING_URL || "https://lu.ma";
+
   return (
     <section className="py-16 px-6">
       <div className="max-w-5xl mx-auto">
         <div className="text-center mb-10">
           <p className="text-violet-600 text-sm font-semibold uppercase tracking-widest mb-2">Learn & Create</p>
           <h2 className="text-3xl font-bold text-gray-900">Upcoming Workshops</h2>
+          <p className="text-gray-500 text-sm mt-3 max-w-2xl mx-auto">
+            Join hands-on sessions on design, fabrication, and rapid prototyping led by Animo Labs FabLab.
+          </p>
         </div>
         <div className="grid md:grid-cols-3 gap-5">
 
@@ -38,6 +43,16 @@ export function WorkshopsSection() {
               </div>
             </div>
           ))}
+        </div>
+        <div className="mt-8 text-center">
+          <a
+            href={workshopsLink}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center justify-center rounded-xl bg-violet-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-violet-200 transition hover:bg-violet-700 hover:shadow-violet-300"
+          >
+            View Workshop Schedule & Register
+          </a>
         </div>
       </div>
     </section>
