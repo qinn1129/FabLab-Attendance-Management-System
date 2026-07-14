@@ -14,6 +14,15 @@ export interface MachineReservation {
   end_time: string;
 }
 
+export interface AttendanceRequest {
+  attendance_request_id: string;
+  rm_id: string;
+  type: string;
+  date: string;
+  reason: string;
+  status: "Pending" | "Approved" | "Rejected";
+}
+
 export interface WeeklySchedule {
   resident_ID: string;
   Monday: string;
@@ -732,6 +741,126 @@ export const sheetsService = {
       if (idx > -1) {
         list[idx] = { ...list[idx], ...updates };
         localStorage.setItem("fablab_reservations_v1", JSON.stringify(list));
+      }
+    }
+  },
+
+  /**
+   * Fetches all attendance requests.
+   */
+  async fetchAttendanceRequests(): Promise<AttendanceRequest[]> {
+    const url = getScriptUrl();
+    if (!url) {
+      console.log("[sheetsService] No VITE_GOOGLE_SCRIPT_URL found. Using localStorage fallback for attendance requests.");
+      const existing = localStorage.getItem("fablab_attendance_requests_v1");
+      return existing ? JSON.parse(existing) : [];
+    }
+
+    try {
+      const secret = import.meta.env.VITE_WEBAPP_SECRET || "";
+      const fetchUrl = `${url}${url.includes("?") ? "&" : "?"}secret=${encodeURIComponent(secret)}&sheet=attendance_requests`;
+      const response = await fetch(fetchUrl);
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+      const data = await response.json();
+      if (data.error) throw new Error(data.error);
+      return data as AttendanceRequest[];
+    } catch (error) {
+      console.error("[sheetsService] Failed to fetch attendance requests from Google Sheets. Falling back to localStorage.", error);
+      const existing = localStorage.getItem("fablab_attendance_requests_v1");
+      return existing ? JSON.parse(existing) : [];
+    }
+  },
+
+  /**
+   * Adds a new attendance request.
+   */
+  async addAttendanceRequest(request: AttendanceRequest): Promise<AttendanceRequest> {
+    const url = getScriptUrl();
+    if (!url) {
+      const existing = localStorage.getItem("fablab_attendance_requests_v1");
+      const list: AttendanceRequest[] = existing ? JSON.parse(existing) : [];
+      list.push(request);
+      localStorage.setItem("fablab_attendance_requests_v1", JSON.stringify(list));
+      return request;
+    }
+
+    try {
+      const secret = import.meta.env.VITE_WEBAPP_SECRET || "";
+      const fetchUrl = `${url}${url.includes("?") ? "&" : "?"}secret=${encodeURIComponent(secret)}&sheet=attendance_requests`;
+      await fetch(fetchUrl, {
+        method: "POST",
+        mode: "no-cors",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify({
+          secret,
+          sheet: "attendance_requests",
+          action: "add",
+          data: request,
+        }),
+      });
+
+      const existing = localStorage.getItem("fablab_attendance_requests_v1");
+      const list: AttendanceRequest[] = existing ? JSON.parse(existing) : [];
+      list.push(request);
+      localStorage.setItem("fablab_attendance_requests_v1", JSON.stringify(list));
+      return request;
+    } catch (error) {
+      console.error("[sheetsService] Failed to add attendance request to Google Sheets. Saving to localStorage.", error);
+      const existing = localStorage.getItem("fablab_attendance_requests_v1");
+      const list: AttendanceRequest[] = existing ? JSON.parse(existing) : [];
+      list.push(request);
+      localStorage.setItem("fablab_attendance_requests_v1", JSON.stringify(list));
+      return request;
+    }
+  },
+
+  /**
+   * Updates an existing attendance request.
+   */
+  async updateAttendanceRequest(requestId: string, updates: Partial<AttendanceRequest>): Promise<void> {
+    const url = getScriptUrl();
+    if (!url) {
+      const existing = localStorage.getItem("fablab_attendance_requests_v1");
+      const list: AttendanceRequest[] = existing ? JSON.parse(existing) : [];
+      const idx = list.findIndex(r => r.attendance_request_id === requestId);
+      if (idx > -1) {
+        list[idx] = { ...list[idx], ...updates };
+        localStorage.setItem("fablab_attendance_requests_v1", JSON.stringify(list));
+      }
+      return;
+    }
+
+    try {
+      const secret = import.meta.env.VITE_WEBAPP_SECRET || "";
+      const fetchUrl = `${url}${url.includes("?") ? "&" : "?"}secret=${encodeURIComponent(secret)}&sheet=attendance_requests`;
+      await fetch(fetchUrl, {
+        method: "POST",
+        mode: "no-cors",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify({
+          secret,
+          sheet: "attendance_requests",
+          action: "update",
+          id: requestId,
+          data: updates,
+        }),
+      });
+
+      const existing = localStorage.getItem("fablab_attendance_requests_v1");
+      const list: AttendanceRequest[] = existing ? JSON.parse(existing) : [];
+      const idx = list.findIndex(r => r.attendance_request_id === requestId);
+      if (idx > -1) {
+        list[idx] = { ...list[idx], ...updates };
+        localStorage.setItem("fablab_attendance_requests_v1", JSON.stringify(list));
+      }
+    } catch (error) {
+      console.error("[sheetsService] Failed to update attendance request. Saving to localStorage.", error);
+      const existing = localStorage.getItem("fablab_attendance_requests_v1");
+      const list: AttendanceRequest[] = existing ? JSON.parse(existing) : [];
+      const idx = list.findIndex(r => r.attendance_request_id === requestId);
+      if (idx > -1) {
+        list[idx] = { ...list[idx], ...updates };
+        localStorage.setItem("fablab_attendance_requests_v1", JSON.stringify(list));
       }
     }
   },

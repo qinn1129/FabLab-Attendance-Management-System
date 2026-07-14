@@ -3,7 +3,7 @@ import { Clock, AlertTriangle, Calendar, Save, Trash2, Check } from "lucide-reac
 import { PageHeader, Select, Input } from "../../components/common";
 import { cn } from "../../lib/utils";
 import { accountsService, parseScheduleDays, stringifyScheduleDays, type Account } from "../../services/accountsService";
-import { sheetsService, type AttendanceLog } from "../../services/sheetsService";
+import { sheetsService, type AttendanceLog, type AttendanceRequest } from "../../services/sheetsService";
 
 const dayMap: Record<string, string> = {
   "Mon": "Monday",
@@ -305,7 +305,7 @@ export function MakerAttendance({
   const [schedDays, setSchedDays] = useState<string[]>(parseScheduleDays(account.schedule));
   const [savingSchedule, setSavingSchedule] = useState(false);
   const [scheduleSaved, setScheduleSaved] = useState("");
-  const [reqForm, setReqForm] = useState({ type: "", date: "", reason: "" });
+  const [reqForm, setReqForm] = useState({ type: "Late Attendance", date: "", reason: "" });
   const [requestSubmitted, setRequestSubmitted] = useState("");
   const days = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
   const isFriday = new Date().getDay() === 5;
@@ -435,10 +435,28 @@ export function MakerAttendance({
     onAccountUpdate({ ...account, ...updates });
   };
 
-  const submitRequest = () => {
-    // Attendance Approval Requests need a dedicated sheet/action on the
-    // backend (separate from account data) — tracked as a follow-up.
-    setRequestSubmitted("Submitted. This will route to Admin review once attendance requests are wired up on the backend.");
+  const submitRequest = async () => {
+    if (!reqForm.type || !reqForm.date || !reqForm.reason.trim()) {
+      alert("Please fill in all fields (type, date, and reason).");
+      return;
+    }
+    const newRequest: AttendanceRequest = {
+      attendance_request_id: "ARQ-" + Date.now(),
+      rm_id: account.id,
+      type: reqForm.type,
+      date: reqForm.date,
+      reason: reqForm.reason.trim(),
+      status: "Pending"
+    };
+    try {
+      await sheetsService.addAttendanceRequest(newRequest);
+      setRequestSubmitted("Request submitted successfully!");
+      setReqForm({ type: "Late Attendance", date: "", reason: "" });
+      setTimeout(() => setRequestSubmitted(""), 4000);
+    } catch (err) {
+      console.error(err);
+      alert("Failed to submit request.");
+    }
   };
 
   return (

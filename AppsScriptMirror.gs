@@ -58,6 +58,11 @@ function setup_attendanceLogs() {
   getOrCreateSheet(ss, "attendanceLogs");
 }
 
+function setup_attendanceRequests() {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  getOrCreateSheet(ss, "attendance_requests");
+}
+
 function getOrCreateSheet(ss, name) {
     let sheet = ss.getSheetByName(name);
     if (!sheet) {
@@ -107,6 +112,9 @@ function getOrCreateSheet(ss, name) {
             sheet.getRange(2, 1, initialMachines.length, headers.length).setValues(initialMachines);
         } else if (name === "machine_reservations") {
             const headers = ["reservation_id", "machine_id", "rm_id", "start_time", "end_time"];
+            sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+        } else if (name === "attendance_requests") {
+            const headers = ["attendance_request_id", "rm_id", "type", "date", "reason", "status"];
             sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
         }
     }
@@ -293,6 +301,7 @@ function doPost(e) {
       let idIndex = headers.indexOf("id");
       if (idIndex === -1) idIndex = headers.indexOf("resident_ID");
       if (idIndex === -1) idIndex = headers.indexOf("reservation_id");
+      if (idIndex === -1) idIndex = headers.indexOf("attendance_request_id");
 
       if (idIndex === -1) {
           throw new Error("No ID column ('id', 'resident_ID', or 'reservation_id') found in sheet headers.");
@@ -334,6 +343,7 @@ function doPost(e) {
       let idIndex = headers.indexOf("id");
       if (idIndex === -1) idIndex = headers.indexOf("resident_ID");
       if (idIndex === -1) idIndex = headers.indexOf("reservation_id");
+      if (idIndex === -1) idIndex = headers.indexOf("attendance_request_id");
       if (idIndex === -1) throw new Error("No ID column found in sheet headers.");
 
       let rowIndex = -1;

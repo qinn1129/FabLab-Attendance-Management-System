@@ -839,7 +839,7 @@ export function MakerReservations({ account }: { account: Account }) {
                             >
                               <div className="flex items-start justify-between gap-1.5 w-full overflow-hidden">
                                 <span className="font-bold truncate select-none leading-none pt-1">
-                                  {makerName}
+                                  {isLocked ? "Unavailable" : makerName}
                                 </span>
                                 {isLocked ? (
                                   <Lock className="w-3.5 h-3.5 flex-shrink-0 opacity-60 mt-0.5" />
