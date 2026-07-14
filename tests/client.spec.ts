@@ -33,18 +33,6 @@ async function makeCapacityAvailable(page: Page) {
 	await expect(page.getByText(/AVAILABLE/i)).toBeVisible();
 }
 
-async function makeCapacityFull(page: Page) {
-	const restoreMockDataButton = page.getByRole('button', {
-		name: /Restore Mock Data/i,
-	});
-
-	await expect(restoreMockDataButton).toBeVisible();
-	await restoreMockDataButton.click();
-
-	await goBackToClientPortalAfterReload(page);
-
-	await expect(page.getByText(/Active Commissions/i)).toBeVisible();
-}
 
 async function openCommissionForm(page: Page) {
 	await goToClientPortal(page);
@@ -181,6 +169,7 @@ async function fillCommissionDetails(
 		filament?: string;
 		urgency?: string;
 		weight?: string;
+		driveLink?: string | null;
 		notes?: string;
 	} = {},
 ) {
@@ -202,12 +191,16 @@ async function fillCommissionDetails(
 		.getByPlaceholder(/Dimensions/i)
 		.fill(options.notes ?? 'This is a QA test commission request.');
 
-	await page.getByPlaceholder(/drive.google.com/i).fill('https://drive.google.com/drive/folders/test-folder-123');
+	if (options.driveLink !== null) {
+		await page
+			.getByPlaceholder(/drive.google.com/i)
+			.fill(options.driveLink ?? 'https://drive.google.com/drive/folders/test-folder-123');
+	}
 
 	await expect(page.getByRole('button', { name: /Next Step/i })).toBeEnabled();
 }
 
-async function fill3DPrintingDetails(page: Page, options?: { weight?: string; uploadFile?: boolean }) {
+async function fill3DPrintingDetails(page: Page, options?: { weight?: string; driveLink?: string | null }) {
 	const weight = options?.weight ?? '200';
 
 	await page.locator('select').nth(0).selectOption('Single Color');
@@ -217,52 +210,123 @@ async function fill3DPrintingDetails(page: Page, options?: { weight?: string; up
 	await page.locator('input[type="number"]').fill(weight);
 	await page.getByPlaceholder(/Dimensions/i).fill('This is a QA test commission request.');
 
-	await page.getByPlaceholder(/drive.google.com/i).fill('https://drive.google.com/drive/folders/test-folder-123');
+	if (options?.driveLink !== null) {
+		await page
+			.getByPlaceholder(/drive.google.com/i)
+			.fill(options?.driveLink ?? 'https://drive.google.com/drive/folders/test-folder-123');
+	}
+}
+
+const GOOGLE_SCRIPT_ROUTE = '**/script.google.com/macros/s/**';
+const EMAIL_SERVICE_ROUTE = 'http://127.0.0.1:5001/api/**';
+
+async function mockGoogleSheets(page: Page, commissions: Record<string, unknown>[] = []) {
+	await page.route(GOOGLE_SCRIPT_ROUTE, async route => {
+		const request = route.request();
+
+		if (request.method() === 'GET') {
+			await route.fulfill({
+				status: 200,
+				contentType: 'application/json',
+				headers: { 'Access-Control-Allow-Origin': '*' },
+				body: JSON.stringify(commissions),
+			});
+			return;
+		}
+
+		await route.fulfill({
+			status: 200,
+			contentType: 'application/json',
+			headers: { 'Access-Control-Allow-Origin': '*' },
+			body: JSON.stringify({ success: true }),
+		});
+	});
+}
+
+async function mockEmailService(page: Page) {
+	await page.route(EMAIL_SERVICE_ROUTE, async route => {
+		const request = route.request();
+		const headers = {
+			'Access-Control-Allow-Origin': '*',
+			'Access-Control-Allow-Methods': 'POST, OPTIONS',
+			'Access-Control-Allow-Headers': 'Content-Type',
+		};
+
+		if (request.method() === 'OPTIONS') {
+			await route.fulfill({ status: 204, headers });
+			return;
+		}
+
+		const isAdminNotification = request.url().includes('/send-admin-notification');
+		await route.fulfill({
+			status: 200,
+			contentType: 'application/json',
+			headers,
+			body: JSON.stringify(
+				isAdminNotification
+					? { sent: 1, recipients: ['qa.admin@example.com'] }
+					: { sent: true, recipients: ['qa.outsider@example.com'] },
+			),
+		});
+	});
 }
 
 test.describe('Client Portal Tests', () => {
-	/*test('TC-001 - client sees full capacity message when FabLab is full', async ({ page }) => {
-		await goToClientPortal(page);
-		await makeCapacityFull(page);
-
-		await page.getByRole('button', { name: /Request a Commission/i }).click();
-
-		await expect(page.getByRole('heading', { name: /FabLab is Full/i })).toBeVisible();
-		await expect(page.getByText(/currently at full capacity/i)).toBeVisible();
-		await expect(page.getByText(/maximum of 3 concurrent active commissions/i)).toBeVisible();
-		await expect(page.getByRole('button', { name: /Return to Home/i })).toBeVisible();
-
-		await expect(page.getByRole('heading', { name: /Personal Details/i })).toHaveCount(0);
+	test.beforeEach(async ({ page }) => {
+		await mockGoogleSheets(page);
+		await mockEmailService(page);
 	});
-
-	test('TC-002 - client can return to client portal from full capacity page', async ({ page }) => {
+	test('TC-001 - client landing page shows FabLab introduction', async ({ page }) => {
 		await goToClientPortal(page);
-		await makeCapacityFull(page);
 
-		await page.getByRole('button', { name: /Request a Commission/i }).click();
-
-		await expect(page.getByRole('heading', { name: /FabLab is Full/i })).toBeVisible();
-
-		await page.getByRole('button', { name: /Return to Home/i }).click();
-
+		await expect(page.getByRole('heading', { name: /Bring Your Ideas to Life/i })).toBeVisible();
+		await expect(page.getByText(/Animo Labs Fabrication Laboratory offers 3D printing, NFC technology, and custom fabrication services/i)).toBeVisible();
+		await expect(page.getByRole('img', { name: /FabLab 3D printing workspace/i })).toBeVisible();
 		await expect(page.getByRole('button', { name: /Request a Commission/i })).toBeVisible();
-		await expect(page.getByText(/FabLab Capacity/i)).toBeVisible();
-		await expect(page.getByText(/\(FULL\)/i)).toBeVisible();
 	});
 
-	test('TC-003 - client can clear database to simulate available space', async ({ page }) => {
+	test('TC-002 - client landing page shows services offered and approved testimonials', async ({ page }) => {
 		await goToClientPortal(page);
-		await makeCapacityFull(page);
 
-		await expect(page.getByText(/\(FULL\)/i)).toBeVisible();
+		await expect(page.getByRole('heading', { name: /Our Services/i })).toBeVisible();
+		await expect(page.getByRole('heading', { name: /FDM 3D Printing/i })).toBeVisible();
+		await expect(page.getByRole('heading', { name: /Design Service/i })).toBeVisible();
+		await expect(page.getByRole('heading', { name: /Custom Keychains/i })).toBeVisible();
+		await expect(page.getByRole('heading', { name: /NFC Keychains/i })).toBeVisible();
 
-		await makeCapacityAvailable(page);
+		await expect(page.getByRole('heading', { name: /What They Say/i })).toBeVisible();
+		await expect(page.getByText(/Nico Alvarez/i)).toBeVisible();
+		await expect(page.getByText(/FabLab made my thesis prototype a reality/i)).toBeVisible();
+	});
 
-		await expect(page.getByText(/FabLab Capacity/i)).toBeVisible();
-		await expect(page.getByText(/0\s*\/\s*3 Active Commissions/i)).toBeVisible();
-		await expect(page.getByText(/\(AVAILABLE\)/i)).toBeVisible();
-		await expect(page.getByText(/\(FULL\)/i)).toHaveCount(0);
-	});*/
+	test('TC-003 - client can submit a testimonial for admin approval', async ({ page }) => {
+		await goToClientPortal(page);
+
+		await page.getByRole('button', { name: /Submit a Testimonial/i }).click();
+		await expect(page.getByRole('heading', { name: /Submit a Testimonial/i })).toBeVisible();
+
+		await page.getByPlaceholder('Juan dela Cruz').fill('QA Testimonial Client');
+		await page.getByPlaceholder("BS ME '26").fill('BSCS-ST');
+		await page.getByRole('combobox').selectOption('4');
+		await page.getByPlaceholder(/Tell us about your FabLab experience/i).fill('The QA testimonial submission flow works correctly.');
+		await page.getByRole('button', { name: /Submit for Approval/i }).click();
+
+		await expect(page.getByText(/testimonial is pending admin approval/i)).toBeVisible();
+
+		const savedTestimonial = await page.evaluate(() => {
+			const stored = JSON.parse(localStorage.getItem('fablab_testimonials_v1') ?? '[]');
+			return stored[0];
+		});
+
+		expect(savedTestimonial).toMatchObject({
+			name: 'QA Testimonial Client',
+			program: 'BSCS-ST',
+			text: 'The QA testimonial submission flow works correctly.',
+			stars: 4,
+			status: 'Pending',
+		});
+	});
+
 
 	test('TC-004 - client can open commission request form after space is available', async ({ page }) => {
 		await goToClientPortal(page);
@@ -322,7 +386,7 @@ test.describe('Client Portal Tests', () => {
 		await expect(page.getByText('QA Student')).toBeVisible();
 		await expect(page.getByText('12345678')).toBeVisible();
 		await expect(page.getByText(/BSCS-ST/i)).toBeVisible();
-		await expect(page.getByText(/3D Printing W\/File/i)).toBeVisible();
+		await expect(page.getByText('3D Printing With File', { exact: true })).toBeVisible();
 		await expect(page.getByText(/Academic \/ Thesis/i)).toBeVisible();
 		await expect(page.getByText(/Single Color/i)).toBeVisible();
 		await expect(page.getByText(/PLA/i)).toBeVisible();
@@ -458,7 +522,7 @@ test.describe('Client Portal Tests', () => {
 
 		await expect(page.getByRole('heading', { name: /Review Your Request/i })).toBeVisible();
 
-		await expect(page.getByText('QA Outsider')).toBeVisible();
+		await expect(page.getByText('QA Outsider', { exact: true })).toBeVisible();
 		await expect(page.getByText('Outsider', { exact: true })).toBeVisible();
 		await expect(page.getByText(/Custom(?:ized)? Keychains/i)).toBeVisible();
 		await expect(page.getByText(/Personal Project/i)).toBeVisible();
@@ -515,7 +579,7 @@ test.describe('Client Portal Tests', () => {
 		}
 	});
 
-	test('TC-020 - 3D Printing W/O File can continue without uploaded file', async ({ page }) => {
+	test('TC-020 - 3D Printing W/O File can continue without a Google Drive file link', async ({ page }) => {
 		await openCommissionForm(page);
 
 		await fillOutsiderPersonalDetails(page);
@@ -526,6 +590,7 @@ test.describe('Client Portal Tests', () => {
 		await fillCommissionDetails(page, {
 			weight: '180',
 			notes: 'QA test for no-upload flow.',
+			driveLink: null,
 		});
 
 		await expect(page.getByRole('button', { name: /Next Step/i })).toBeEnabled();
@@ -533,7 +598,7 @@ test.describe('Client Portal Tests', () => {
 		await page.getByRole('button', { name: /Next Step/i }).click();
 
 		await expect(page.getByRole('heading', { name: /Review Your Request/i })).toBeVisible();
-		await expect(page.getByText(/3D Printing W\/O File/i)).toBeVisible();
+		await expect(page.getByText('3D Printing Without File (Modelling Needed)', { exact: true }),).toBeVisible();
 		await expect(page.getByText(/Personal Project/i)).toBeVisible();
 	});
 
@@ -626,4 +691,90 @@ test.describe('Client Portal Tests', () => {
 			page.getByText(/Commissions submitted Friday to Sunday are processed starting the following week/i),
 		).toHaveCount(0);
 	});
+
+	test('TC-026 - 3D Printing W/File requires and saves the Google Drive file link', async ({ page }) => {
+		await openCommissionForm(page);
+
+		await fillOutsiderPersonalDetails(page);
+		await goToServiceSelection(page);
+		await select3DPrintingWithFile(page);
+
+		await expect(page.getByText(/Google Drive Link \(file upload link\)/i)).toBeVisible();
+		await page.locator('select').nth(0).selectOption('Single Color');
+		await page.locator('select').nth(1).selectOption('PLA');
+		await page.locator('input[type="date"]').fill('2026-07-20');
+		await page.locator('input[type="number"]').fill('200');
+		await page.getByPlaceholder(/Dimensions/i).fill('QA checks the file-link workflow.');
+
+		await expect(page.getByRole('button', { name: /Next Step/i })).toBeDisabled();
+
+		const driveLink = 'https://drive.google.com/drive/folders/qa-file-upload-test';
+		await page.getByPlaceholder(/drive.google.com/i).fill(driveLink);
+		await expect(page.getByRole('button', { name: /Next Step/i })).toBeEnabled();
+		await page.getByRole('button', { name: /Next Step/i }).click();
+
+		await expect(page.getByRole('heading', { name: /Review Your Request/i })).toBeVisible();
+		await expect(page.getByText(driveLink, { exact: true })).toBeVisible();
+	});
+
+	test('TC-027 - submitting a request calls both admin and client email endpoints', async ({ page }) => {
+		await openCommissionForm(page);
+
+		await fillOutsiderPersonalDetails(page);
+		await goToServiceSelection(page);
+		await selectServiceAndPurpose(page, /Modelling Only/i, 'Personal Project');
+		await fillCommissionDetails(page);
+		await page.getByRole('button', { name: /Next Step/i }).click();
+
+		const adminEmailRequest = page.waitForRequest(request =>
+			request.method() === 'POST' && request.url().includes('/api/send-admin-notification'),
+		);
+		const clientEmailRequest = page.waitForRequest(request =>
+			request.method() === 'POST' && request.url().includes('/api/send-client-queue-notification'),
+		);
+
+		await page.getByRole('button', { name: /Submit Request/i }).click();
+
+		const [adminRequest, clientRequest] = await Promise.all([adminEmailRequest, clientEmailRequest]);
+		const adminBody = adminRequest.postDataJSON();
+		const clientBody = clientRequest.postDataJSON();
+
+		expect(adminBody).toMatchObject({
+			clientName: 'QA Outsider',
+			clientEmail: 'qa.outsider@example.com',
+			clientType: 'Outsider',
+			service: 'Modelling Only',
+		});
+		expect(adminBody.commissionId).toMatch(/^COM-\d{3,}$/);
+
+		expect(clientBody).toMatchObject({
+			clientName: 'QA Outsider',
+			clientEmail: 'qa.outsider@example.com',
+			service: 'Modelling Only',
+		});
+		expect(clientBody.commissionId).toBe(adminBody.commissionId);
+
+		await expect(page.getByRole('heading', { name: /Request Submitted/i })).toBeVisible();
+		await expect(page.getByText(/Confirmation email sent to qa\.outsider@example\.com/i)).toBeVisible();
+		await expect(page.getByText(/Admin queue notified/i)).toBeVisible();
+	});
+
+	test('TC-028 - client is blocked when there are 3 active commissions', async ({ page }) => {
+		test.fail(true, 'Known requirement mismatch: the current ClientPortal always shows AVAILABLE and no longer blocks submissions at 3 active commissions.');
+
+		await page.unroute(GOOGLE_SCRIPT_ROUTE);
+		await mockGoogleSheets(page, [
+			{ id: 'COM-001', status: 'In Progress' },
+			{ id: 'COM-002', status: 'Pending' },
+			{ id: 'COM-003', status: 'In Progress' },
+		]);
+
+		await goToClientPortal(page);
+		await expect(page.getByText(/\(FULL\)/i)).toBeVisible();
+
+		await page.getByRole('button', { name: /Request a Commission/i }).click();
+		await expect(page.getByRole('heading', { name: /FabLab is Full/i })).toBeVisible();
+		await expect(page.getByText(/maximum of 3 concurrent active commissions/i)).toBeVisible();
+	});
+
 });
