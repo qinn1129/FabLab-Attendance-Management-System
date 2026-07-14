@@ -24,6 +24,12 @@ const POLL_INTERVAL_MS = 4000;
 const MAX_MENTION_RESULTS = 6;
 const EVERYONE_TOKEN = "everyone";
 
+// Custom notification sound files. Drop your own .mp4 files at these paths
+// under the project's public/ folder (e.g. public/sounds/mention.mp4) to
+// customize them — no code changes needed beyond these two constants.
+const MENTION_SOUND_URL = "/sounds/mention.wav";
+const EVERYONE_SOUND_URL = "/sounds/everyone.wav";
+
 function initialsFor(name: string | undefined | null): string {
   const safe = (name || "").trim();
   if (!safe) return "?";
@@ -51,7 +57,9 @@ function escapeRegExp(s: string): string {
  * reloads and are visible to everyone using the app. Supports "@" mentions that
  * autocomplete against all active Admin and Resident Maker accounts, plus a
  * special "@everyone" broadcast mention. Plays a distinct notification chime
- * for personal mentions vs. @everyone broadcasts.
+ * for personal mentions vs. @everyone broadcasts, and shows an unread badge
+ * on the floating bubble while the widget is closed. Polls continuously
+ * (open or closed) so notifications still fire when the widget is minimized.
  * @param {ChatWidgetProps} props
  * @returns {JSX.Element}
  */
@@ -61,9 +69,18 @@ export function ChatWidget({ accentColor = "emerald", senderName, senderRole }: 
   const [msgs, setMsgs] = useState<ChatMessage[]>([]);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Kept in a ref (rather than reading `open` directly) so loadMessages
+  // doesn't need to be recreated every time the widget opens/closes, which
+  // would otherwise restart the polling interval unnecessarily.
+  const isOpenRef = useRef(open);
+  useEffect(() => {
+    isOpenRef.current = open;
+  }, [open]);
 
   // ── @mention state ─────────────────────────────────────────────
   const [mentionableUsers, setMentionableUsers] = useState<{ name: string; role: "Admin" | "ResidentMaker" }[]>([]);
@@ -73,7 +90,12 @@ export function ChatWidget({ accentColor = "emerald", senderName, senderRole }: 
   const [activeMentionIndex, setActiveMentionIndex] = useState(0);
 
   // ── notification sound state ───────────────────────────────────
+  // Real audio files (customizable) are the primary sound source. A
+  // synthesized tone via Web Audio is kept only as a silent-file/error
+  // fallback so a missing or broken .mp4 never breaks notifications.
   const audioCtxRef = useRef<AudioContext | null>(null);
+  const mentionAudioRef = useRef<HTMLAudioElement | null>(null);
+  const everyoneAudioRef = useRef<HTMLAudioElement | null>(null);
   const knownIdsRef = useRef<Set<string> | null>(null); // null = first load hasn't happened yet
 
   const ensureAudioContext = useCallback((): AudioContext | null => {
@@ -86,23 +108,19 @@ export function ChatWidget({ accentColor = "emerald", senderName, senderRole }: 
     return audioCtxRef.current;
   }, []);
 
-  // Browsers block audio until a user gesture has occurred on the page.
-  // This unlocks the AudioContext on the first click/keypress so sounds
-  // aren't silently swallowed later when a real notification fires.
-  useEffect(() => {
-    const unlock = () => {
-      const ctx = ensureAudioContext();
-      if (ctx && ctx.state === "suspended") ctx.resume();
-    };
-    window.addEventListener("pointerdown", unlock, { once: true });
-    window.addEventListener("keydown", unlock, { once: true });
-    return () => {
-      window.removeEventListener("pointerdown", unlock);
-      window.removeEventListener("keydown", unlock);
-    };
-  }, [ensureAudioContext]);
+  const getOrCreateAudioElement = useCallback(
+    (ref: React.MutableRefObject<HTMLAudioElement | null>, url: string): HTMLAudioElement => {
+      if (!ref.current) {
+        const el = new Audio(url);
+        el.preload = "auto";
+        ref.current = el;
+      }
+      return ref.current;
+    },
+    []
+  );
 
-  /** Plays a short sequence of tones. Each entry in `frequencies` is one note. */
+  /** Plays a short sequence of tones. Each entry in `frequencies` is one note. Used only as a fallback. */
   const playTones = useCallback((frequencies: number[], noteDurationMs = 130, gapMs = 35) => {
     const ctx = ensureAudioContext();
     if (!ctx) return;
@@ -123,27 +141,89 @@ export function ChatWidget({ accentColor = "emerald", senderName, senderRole }: 
     });
   }, [ensureAudioContext]);
 
-  /** Single clear beep — someone mentioned you personally. */
-  const playMentionSound = useCallback(() => playTones([880], 150), [playTones]);
+  /** Plays the given audio file from the beginning; falls back to a synthesized tone on any failure. */
+  const playAudioFile = useCallback(
+    (ref: React.MutableRefObject<HTMLAudioElement | null>, url: string, fallback: () => void) => {
+      try {
+        const audio = getOrCreateAudioElement(ref, url);
+        audio.currentTime = 0;
+        audio.play().catch(err => {
+          console.warn(`[ChatWidget] Could not play "${url}", using fallback tone instead.`, err);
+          fallback();
+        });
+      } catch (err) {
+        console.warn(`[ChatWidget] Notification audio failed for "${url}", using fallback tone instead.`, err);
+        fallback();
+      }
+    },
+    [getOrCreateAudioElement]
+  );
 
-  /** Two-tone ascending chime — an @everyone broadcast, meant to stand out more. */
-  const playEveryoneSound = useCallback(() => playTones([660, 990, 1320], 110, 25), [playTones]);
+  // Browsers block audio playback until a user gesture has occurred on the
+  // page. This "primes" both the AudioContext and the two <audio> elements
+  // on the first click/keypress — playing each muted then immediately
+  // pausing — so the real notification sound isn't silently swallowed later.
+  useEffect(() => {
+    const unlock = () => {
+      const ctx = ensureAudioContext();
+      if (ctx && ctx.state === "suspended") ctx.resume();
+
+      [
+        [mentionAudioRef, MENTION_SOUND_URL],
+        [everyoneAudioRef, EVERYONE_SOUND_URL],
+      ].forEach(([ref, url]) => {
+        const audio = getOrCreateAudioElement(ref as React.MutableRefObject<HTMLAudioElement | null>, url as string);
+        const originalVolume = audio.volume;
+        audio.volume = 0;
+        audio.play()
+          .then(() => {
+            audio.pause();
+            audio.currentTime = 0;
+            audio.volume = originalVolume;
+          })
+          .catch(() => {
+            audio.volume = originalVolume;
+          });
+      });
+    };
+    window.addEventListener("pointerdown", unlock, { once: true });
+    window.addEventListener("keydown", unlock, { once: true });
+    return () => {
+      window.removeEventListener("pointerdown", unlock);
+      window.removeEventListener("keydown", unlock);
+    };
+  }, [ensureAudioContext, getOrCreateAudioElement]);
+
+  /** Someone mentioned you personally. */
+  const playMentionSound = useCallback(() => {
+    playAudioFile(mentionAudioRef, MENTION_SOUND_URL, () => playTones([880], 150));
+  }, [playAudioFile, playTones]);
+
+  /** An @everyone broadcast — meant to stand out more. */
+  const playEveryoneSound = useCallback(() => {
+    playAudioFile(everyoneAudioRef, EVERYONE_SOUND_URL, () => playTones([660, 990, 1320], 110, 25));
+  }, [playAudioFile, playTones]);
 
   const loadMessages = useCallback(async () => {
     const data = await chatService.fetchMessages();
 
     if (knownIdsRef.current === null) {
       // First load ever: just record what's already there. Never play sounds
-      // for pre-existing history.
+      // or bump the unread badge for pre-existing history.
       knownIdsRef.current = new Set(data.map(m => m.id));
     } else {
       const newOnes = data.filter(m => !knownIdsRef.current!.has(m.id));
       if (newOnes.length > 0) {
+        const trulyNew = newOnes.filter(m => m.sender !== safeSenderName);
+
+        if (trulyNew.length > 0 && !isOpenRef.current) {
+          setUnreadCount(c => c + trulyNew.length);
+        }
+
         const mentionPattern = new RegExp(`@${escapeRegExp(safeSenderName)}(?![a-zA-Z0-9])`, "i");
         let sawEveryone = false;
         let sawMention = false;
-        for (const m of newOnes) {
-          if (m.sender === safeSenderName) continue; // never notify on your own messages
+        for (const m of trulyNew) {
           const lower = m.text.toLowerCase();
           if (lower.includes(`@${EVERYONE_TOKEN}`)) {
             sawEveryone = true;
@@ -171,28 +251,26 @@ export function ChatWidget({ accentColor = "emerald", senderName, senderRole }: 
     });
   }, []);
 
-  // Initial load so unread messages/notifications are captured even before
-  // opening the widget.
+  // Poll continuously for the entire lifetime of the widget, regardless of
+  // open/closed state, so mention/everyone notification sounds and the
+  // unread badge still work while the panel is minimized.
   useEffect(() => {
     loadMessages();
-  }, [loadMessages]);
-
-  // Poll for new messages only while the widget is open, to avoid hammering
-  // the Apps Script endpoint in the background.
-  useEffect(() => {
-    if (open) {
-      loadMessages();
-      pollRef.current = setInterval(loadMessages, POLL_INTERVAL_MS);
-    } else if (pollRef.current) {
-      clearInterval(pollRef.current);
-      pollRef.current = null;
-    }
+    pollRef.current = setInterval(loadMessages, POLL_INTERVAL_MS);
     return () => {
       if (pollRef.current) {
         clearInterval(pollRef.current);
         pollRef.current = null;
       }
     };
+  }, [loadMessages]);
+
+  // Refresh immediately and clear the unread badge whenever the widget is opened.
+  useEffect(() => {
+    if (open) {
+      loadMessages();
+      setUnreadCount(0);
+    }
   }, [open, loadMessages]);
 
   useEffect(() => {
@@ -437,9 +515,14 @@ export function ChatWidget({ accentColor = "emerald", senderName, senderRole }: 
 
       <button
         onClick={() => setOpen(o => !o)}
-        className={cn("w-14 h-14 rounded-full shadow-lg flex items-center justify-center text-white transition", accent)}
+        className={cn("relative w-14 h-14 rounded-full shadow-lg flex items-center justify-center text-white transition", accent)}
       >
         {open ? <X className="w-6 h-6" /> : <MessageCircle className="w-6 h-6" />}
+        {!open && unreadCount > 0 && (
+          <span className="absolute -top-1 -right-1 min-w-[20px] h-5 px-1 rounded-full bg-red-500 text-white text-[11px] font-bold flex items-center justify-center border-2 border-card">
+            {unreadCount > 9 ? "9+" : unreadCount}
+          </span>
+        )}
       </button>
     </div>
   );
