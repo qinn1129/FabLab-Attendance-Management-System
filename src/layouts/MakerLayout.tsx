@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { ChevronRight, LogOut, Clock, User, Package, Book, Home } from "lucide-react";
+import { ChevronRight, LogOut, Clock, User, Package, Book, Home, Calendar } from "lucide-react";
 import { ChatWidget } from "../components/common/ChatWidget";
 import { ThemeToggle } from "../components/common";
 import { cn } from "../lib/utils";
@@ -10,6 +10,7 @@ import { cn } from "../lib/utils";
 export const RM_NAV = [
   { id: "dashboard", label: "Dashboard", icon: Home },
   { id: "attendance", label: "Attendance", icon: Clock },
+  { id: "reservations", label: "Reservations", icon: Calendar },
   { id: "commissions", label: "My Commissions", icon: Package },
   { id: "resources", label: "Resources", icon: Book },
   { id: "profile", label: "Profile", icon: User },

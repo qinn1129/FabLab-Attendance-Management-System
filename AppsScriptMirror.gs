@@ -95,6 +95,19 @@ function getOrCreateSheet(ss, name) {
         } else if (name === "attendanceLogs") {
             const headers = ["id", "resident_id", "clock_in_timestamp", "clock_out_timestamp", "total_hours", "status"];
             sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+        } else if (name === "machines") {
+            const headers = ["id", "Machine Model", "Placement / Location Notes"];
+            sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+            const initialMachines = [
+                ["MAC-001", "Ender 3 Pro #1", "3D Printing Area - Table A"],
+                ["MAC-002", "Bambu Lab P1S", "3D Printing Area - Shelf A"],
+                ["MAC-003", "Ender 3 Pro #2", "3D Printing Area - Table A"],
+                ["MAC-004", "Bambu Lab A1", "3D Printing Area - Table B"]
+            ];
+            sheet.getRange(2, 1, initialMachines.length, headers.length).setValues(initialMachines);
+        } else if (name === "machine_reservations") {
+            const headers = ["reservation_id", "machine_id", "rm_id", "start_time", "end_time"];
+            sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
         }
     }
     return sheet;
@@ -278,12 +291,11 @@ function doPost(e) {
       const headers = data[0];
       
       let idIndex = headers.indexOf("id");
-      if (idIndex === -1) {
-          idIndex = headers.indexOf("resident_ID");
-      }
+      if (idIndex === -1) idIndex = headers.indexOf("resident_ID");
+      if (idIndex === -1) idIndex = headers.indexOf("reservation_id");
 
       if (idIndex === -1) {
-          throw new Error("No ID column ('id' or 'resident_ID') found in sheet headers.");
+          throw new Error("No ID column ('id', 'resident_ID', or 'reservation_id') found in sheet headers.");
       }
 
       let rowIndex = -1;
@@ -321,6 +333,7 @@ function doPost(e) {
       const headers = data[0];
       let idIndex = headers.indexOf("id");
       if (idIndex === -1) idIndex = headers.indexOf("resident_ID");
+      if (idIndex === -1) idIndex = headers.indexOf("reservation_id");
       if (idIndex === -1) throw new Error("No ID column found in sheet headers.");
 
       let rowIndex = -1;
@@ -485,4 +498,9 @@ function purgeExpiredChatMessages(sheet) {
       sheet.deleteRow(i + 1);
     }
   }
+}
+
+function setup_chat() {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  getOrCreateSheet(ss, "chat");
 }

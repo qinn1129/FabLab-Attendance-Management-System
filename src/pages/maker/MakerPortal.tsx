@@ -7,6 +7,7 @@ import { MakerAttendance } from "./Attendance";
 import { MakerCommissions } from "./Commissions";
 import { MakerResources } from "./Resources";
 import { MakerProfile } from "./Profile";
+import { MakerReservations } from "./Reservations";
 import { accountsService, type Account } from "../../services/accountsService";
 import { rememberMe } from "../../lib/rememberMe";
 import { type Commission } from "../../services/sheetsService";
@@ -227,6 +228,7 @@ export function MakerPortal({
     switch (screen) {
       case "dashboard": return <MakerDashboard commissions={commissions} account={account!} />;
       case "attendance": return <MakerAttendance account={account!} onAccountUpdate={setAccount} />;
+      case "reservations": return <MakerReservations account={account!} />;
       case "commissions": return <MakerCommissions commissions={commissions} onUpdate={onUpdate} makerName={makerName} />;
       case "resources": return <MakerResources />;
       case "profile": return <MakerProfile account={account!} onAccountUpdate={setAccount} />;

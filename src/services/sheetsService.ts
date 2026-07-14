@@ -1,5 +1,19 @@
 import { COMMISSIONS as initialCommissions } from "../constants/mockData";
 
+export interface Machine {
+  id: string;
+  "Machine Model": string;
+  "Placement / Location Notes": string;
+}
+
+export interface MachineReservation {
+  reservation_id: string;
+  machine_id: string;
+  rm_id: string;
+  start_time: string;
+  end_time: string;
+}
+
 export interface WeeklySchedule {
   resident_ID: string;
   Monday: string;
@@ -511,6 +525,213 @@ export const sheetsService = {
       if (idx > -1) {
         logs[idx] = { ...logs[idx], ...updates };
         localStorage.setItem("fablab_attendance_logs_v1", JSON.stringify(logs));
+      }
+    }
+  },
+
+  /**
+   * Fetches all machines from Google Sheets or localStorage fallback.
+   */
+  async fetchMachines(): Promise<Machine[]> {
+    const url = getScriptUrl();
+    if (!url) {
+      console.log("[sheetsService] No VITE_GOOGLE_SCRIPT_URL found. Using localStorage fallback for machines.");
+      const existing = localStorage.getItem("fablab_machines_v1");
+      if (existing) {
+        return JSON.parse(existing);
+      }
+      const seeded: Machine[] = [
+        { id: "MAC-001", "Machine Model": "Ender 3 Pro #1", "Placement / Location Notes": "3D Printing Area - Table A" },
+        { id: "MAC-002", "Machine Model": "Bambu Lab P1S", "Placement / Location Notes": "3D Printing Area - Shelf A" },
+        { id: "MAC-003", "Machine Model": "Ender 3 Pro #2", "Placement / Location Notes": "3D Printing Area - Table A" },
+        { id: "MAC-004", "Machine Model": "Bambu Lab A1", "Placement / Location Notes": "3D Printing Area - Table B" },
+      ];
+      localStorage.setItem("fablab_machines_v1", JSON.stringify(seeded));
+      return seeded;
+    }
+
+    try {
+      const secret = import.meta.env.VITE_WEBAPP_SECRET || "";
+      const fetchUrl = `${url}${url.includes("?") ? "&" : "?"}secret=${encodeURIComponent(secret)}&sheet=machines`;
+      const response = await fetch(fetchUrl);
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+      const data = await response.json();
+      if (data.error) throw new Error(data.error);
+      return data as Machine[];
+    } catch (error) {
+      console.error("[sheetsService] Failed to fetch machines from Google Sheets. Falling back to localStorage.", error);
+      const existing = localStorage.getItem("fablab_machines_v1");
+      if (existing) {
+        return JSON.parse(existing);
+      }
+      const seeded: Machine[] = [
+        { id: "MAC-001", "Machine Model": "Ender 3 Pro #1", "Placement / Location Notes": "3D Printing Area - Table A" },
+        { id: "MAC-002", "Machine Model": "Bambu Lab P1S", "Placement / Location Notes": "3D Printing Area - Shelf A" },
+        { id: "MAC-003", "Machine Model": "Ender 3 Pro #2", "Placement / Location Notes": "3D Printing Area - Table A" },
+        { id: "MAC-004", "Machine Model": "Bambu Lab A1", "Placement / Location Notes": "3D Printing Area - Table B" },
+      ];
+      localStorage.setItem("fablab_machines_v1", JSON.stringify(seeded));
+      return seeded;
+    }
+  },
+
+  /**
+   * Fetches all machine reservations.
+   */
+  async fetchReservations(): Promise<MachineReservation[]> {
+    const url = getScriptUrl();
+    if (!url) {
+      console.log("[sheetsService] No VITE_GOOGLE_SCRIPT_URL found. Using localStorage fallback for reservations.");
+      const existing = localStorage.getItem("fablab_reservations_v1");
+      return existing ? JSON.parse(existing) : [];
+    }
+
+    try {
+      const secret = import.meta.env.VITE_WEBAPP_SECRET || "";
+      const fetchUrl = `${url}${url.includes("?") ? "&" : "?"}secret=${encodeURIComponent(secret)}&sheet=machine_reservations`;
+      const response = await fetch(fetchUrl);
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+      const data = await response.json();
+      if (data.error) throw new Error(data.error);
+      return data as MachineReservation[];
+    } catch (error) {
+      console.error("[sheetsService] Failed to fetch reservations from Google Sheets. Falling back to localStorage.", error);
+      const existing = localStorage.getItem("fablab_reservations_v1");
+      return existing ? JSON.parse(existing) : [];
+    }
+  },
+
+  /**
+   * Adds a new machine reservation.
+   */
+  async addReservation(reservation: MachineReservation): Promise<MachineReservation> {
+    const url = getScriptUrl();
+    if (!url) {
+      const existing = localStorage.getItem("fablab_reservations_v1");
+      const list: MachineReservation[] = existing ? JSON.parse(existing) : [];
+      list.push(reservation);
+      localStorage.setItem("fablab_reservations_v1", JSON.stringify(list));
+      return reservation;
+    }
+
+    try {
+      const secret = import.meta.env.VITE_WEBAPP_SECRET || "";
+      const fetchUrl = `${url}${url.includes("?") ? "&" : "?"}secret=${encodeURIComponent(secret)}&sheet=machine_reservations`;
+      await fetch(fetchUrl, {
+        method: "POST",
+        mode: "no-cors",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify({
+          secret,
+          sheet: "machine_reservations",
+          action: "add",
+          data: reservation,
+        }),
+      });
+
+      const existing = localStorage.getItem("fablab_reservations_v1");
+      const list: MachineReservation[] = existing ? JSON.parse(existing) : [];
+      list.push(reservation);
+      localStorage.setItem("fablab_reservations_v1", JSON.stringify(list));
+      return reservation;
+    } catch (error) {
+      console.error("[sheetsService] Failed to add reservation to Google Sheets. Saving to localStorage.", error);
+      const existing = localStorage.getItem("fablab_reservations_v1");
+      const list: MachineReservation[] = existing ? JSON.parse(existing) : [];
+      list.push(reservation);
+      localStorage.setItem("fablab_reservations_v1", JSON.stringify(list));
+      return reservation;
+    }
+  },
+
+  /**
+   * Cancels/deletes a reservation.
+   */
+  async deleteReservation(reservationId: string): Promise<void> {
+    const url = getScriptUrl();
+    if (!url) {
+      const existing = localStorage.getItem("fablab_reservations_v1");
+      const list: MachineReservation[] = existing ? JSON.parse(existing) : [];
+      const filtered = list.filter(r => r.reservation_id !== reservationId);
+      localStorage.setItem("fablab_reservations_v1", JSON.stringify(filtered));
+      return;
+    }
+
+    try {
+      const secret = import.meta.env.VITE_WEBAPP_SECRET || "";
+      const fetchUrl = `${url}${url.includes("?") ? "&" : "?"}secret=${encodeURIComponent(secret)}&sheet=machine_reservations`;
+      await fetch(fetchUrl, {
+        method: "POST",
+        mode: "no-cors",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify({
+          secret,
+          sheet: "machine_reservations",
+          action: "delete",
+          id: reservationId,
+        }),
+      });
+
+      const existing = localStorage.getItem("fablab_reservations_v1");
+      const list: MachineReservation[] = existing ? JSON.parse(existing) : [];
+      const filtered = list.filter(r => r.reservation_id !== reservationId);
+      localStorage.setItem("fablab_reservations_v1", JSON.stringify(filtered));
+    } catch (error) {
+      console.error("[sheetsService] Failed to delete reservation from Google Sheets. Saving to localStorage.", error);
+      const existing = localStorage.getItem("fablab_reservations_v1");
+      const list: MachineReservation[] = existing ? JSON.parse(existing) : [];
+      const filtered = list.filter(r => r.reservation_id !== reservationId);
+      localStorage.setItem("fablab_reservations_v1", JSON.stringify(filtered));
+    }
+  },
+
+  /**
+   * Updates an existing reservation (e.g. for drag rescheduling).
+   */
+  async updateReservation(reservationId: string, updates: Partial<MachineReservation>): Promise<void> {
+    const url = getScriptUrl();
+    if (!url) {
+      const existing = localStorage.getItem("fablab_reservations_v1");
+      const list: MachineReservation[] = existing ? JSON.parse(existing) : [];
+      const idx = list.findIndex(r => r.reservation_id === reservationId);
+      if (idx > -1) {
+        list[idx] = { ...list[idx], ...updates };
+        localStorage.setItem("fablab_reservations_v1", JSON.stringify(list));
+      }
+      return;
+    }
+
+    try {
+      const secret = import.meta.env.VITE_WEBAPP_SECRET || "";
+      const fetchUrl = `${url}${url.includes("?") ? "&" : "?"}secret=${encodeURIComponent(secret)}&sheet=machine_reservations`;
+      await fetch(fetchUrl, {
+        method: "POST",
+        mode: "no-cors",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify({
+          secret,
+          sheet: "machine_reservations",
+          action: "update",
+          id: reservationId,
+          data: updates,
+        }),
+      });
+
+      const existing = localStorage.getItem("fablab_reservations_v1");
+      const list: MachineReservation[] = existing ? JSON.parse(existing) : [];
+      const idx = list.findIndex(r => r.reservation_id === reservationId);
+      if (idx > -1) {
+        list[idx] = { ...list[idx], ...updates };
+        localStorage.setItem("fablab_reservations_v1", JSON.stringify(list));
+      }
+    } catch (error) {
+      console.error("[sheetsService] Failed to update reservation. Saving to localStorage.", error);
+      const existing = localStorage.getItem("fablab_reservations_v1");
+      const list: MachineReservation[] = existing ? JSON.parse(existing) : [];
+      const idx = list.findIndex(r => r.reservation_id === reservationId);
+      if (idx > -1) {
+        list[idx] = { ...list[idx], ...updates };
+        localStorage.setItem("fablab_reservations_v1", JSON.stringify(list));
       }
     }
   },
