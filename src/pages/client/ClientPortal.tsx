@@ -162,7 +162,7 @@ export function ClientPortal({
         pickupOption: form.pickupOption,
         weight: form.weight,
         notes: form.notes,
-        file: "N/A (Drive link provided)",
+        file: form.driveLink.trim() || "N/A (Drive link provided)",
         driveLink: form.driveLink,
         submitted: submittedDate
       };
