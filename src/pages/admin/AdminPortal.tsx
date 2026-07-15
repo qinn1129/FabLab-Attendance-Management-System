@@ -15,6 +15,8 @@ import { AdminFAQ } from "./FAQ";
 import { accountsService, type Account } from "../../services/accountsService";
 import { rememberMe } from "../../lib/rememberMe";
 import { type Commission } from "../../services/sheetsService";
+import { AdminServices } from "./Services";
+import { AdminWorkshops } from "./Workshops";
 
 
 export function AdminPortal({
@@ -144,6 +146,8 @@ export function AdminPortal({
       case "rm-accounts": return <AdminRMAccounts />;
       case "profile": return <AdminProfile account={account!} onAccountUpdate={setAccount} />;
       case "faq": return <AdminFAQ />;
+      case "services": return <AdminServices />;
+      case "workshops": return <AdminWorkshops />;
       default: return <AdminDashboard commissions={commissions} />;
     }
   };

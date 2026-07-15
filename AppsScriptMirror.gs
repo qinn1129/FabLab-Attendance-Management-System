@@ -63,6 +63,16 @@ function setup_attendanceRequests() {
   getOrCreateSheet(ss, "attendance_requests");
 }
 
+function setup_services() {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  getOrCreateSheet(ss, "services");
+}
+ 
+function setup_workshops() {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  getOrCreateSheet(ss, "workshops");
+}
+
 function getOrCreateSheet(ss, name) {
     let sheet = ss.getSheetByName(name);
     if (!sheet) {
@@ -116,9 +126,15 @@ function getOrCreateSheet(ss, name) {
         } else if (name === "attendance_requests") {
             const headers = ["attendance_request_id", "rm_id", "type", "date", "reason", "status"];
             sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
-        }
+        } else if (name === "services") {
+            const headers = ["id", "title", "desc", "icon", "image", "order", "createdAt"];
+            sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+        } else if (name === "workshops") {
+            const headers = ["id", "title", "date", "tag", "image", "link", "order", "createdAt"];
+            sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
     }
     return sheet;
+}
 }
 
 /**

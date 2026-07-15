@@ -1,12 +1,26 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
+import { workshopsService, type Workshop } from "../../services/workshopService";
 
 /**
  * Workshops showcase section for the Client landing page.
+ * Now backed by the "workshops" sheet (managed via Admin > Workshops)
+ * instead of a hardcoded array. Each card's button links out to the
+ * workshop's attached external booking link (e.g. Luma) when provided.
  * Domain: Client
  * @returns {JSX.Element}
  */
 export function WorkshopsSection() {
-  const workshopsLink = import.meta.env.VITE_WORKSHOPS_BOOKING_URL || "https://lu.ma";
+  const [workshops, setWorkshops] = useState<Workshop[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    workshopsService.fetchWorkshops().then(data => {
+      setWorkshops(data);
+      setLoading(false);
+    });
+  }, []);
+
+  if (!loading && workshops.length === 0) return null;
 
   return (
     <section className="py-16 px-6">
@@ -14,45 +28,53 @@ export function WorkshopsSection() {
         <div className="text-center mb-10">
           <p className="text-violet-600 text-sm font-semibold uppercase tracking-widest mb-2">Learn & Create</p>
           <h2 className="text-3xl font-bold text-gray-900">Upcoming Workshops</h2>
-          <p className="text-gray-500 text-sm mt-3 max-w-2xl mx-auto">
-            Join hands-on sessions on design, fabrication, and rapid prototyping led by Animo Labs FabLab.
-          </p>
         </div>
         <div className="grid md:grid-cols-3 gap-5">
+          {loading ? (
+            Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="rounded-xl overflow-hidden border border-gray-100 animate-pulse h-52 bg-gray-100" />
+            ))
+          ) : (
+            workshops.map(w => {
+              const CardInner = (
+                <>
+                  <div className="relative h-36 bg-gray-200">
+                    <img
+                      src={w.image}
+                      alt={w.title}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    />
+                    <div className="absolute bottom-2 left-3">
+                      <span className="bg-violet-600 text-white text-xs font-semibold px-2 py-0.5 rounded">{w.date}</span>
+                    </div>
+                  </div>
+                  <div className="p-4">
+                    <h3 className="font-semibold text-gray-900 text-sm mb-1">{w.title}</h3>
+                    <p className="text-gray-400 text-xs">{w.tag}</p>
+                    {w.link && (
+                      <p className="text-violet-600 text-xs font-semibold mt-2 group-hover:underline">Register →</p>
+                    )}
+                  </div>
+                </>
+              );
 
-          {/*HARDCODE AND AI-GENERATED INFORMATION, IM GONNA ASK SIR PA HERE IF HE WANTS TO ADD/EDIT THIS*/}
-          {[
-            { date: "Jun 28", title: "Intro to Fusion 360", tag: "Free • Beginner", img: "photo-1605810230434-7631ac76ec81" },
-            { date: "Jul 05", title: "FDM Printing Fundamentals", tag: "Free • All Levels", img: "photo-1563770660941-20978e870e26" },
-            { date: "Jul 12", title: "NFC Tech Workshop", tag: "Free • Intermediate", img: "photo-1535223289827-42f1e9919769" },
-          ].map(w => (
-            <div key={w.title} className="rounded-xl overflow-hidden border border-gray-100 group">
-              <div className="relative h-36 bg-gray-200">
-                <img
-                  src={`https://images.unsplash.com/${w.img}?w=400&h=200&fit=crop&auto=format`}
-                  alt={w.title}
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                />
-                <div className="absolute bottom-2 left-3">
-                  <span className="bg-violet-600 text-white text-xs font-semibold px-2 py-0.5 rounded">{w.date}</span>
+              return w.link ? (
+                <a
+                  key={w.id}
+                  href={w.link}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="rounded-xl overflow-hidden border border-gray-100 group block"
+                >
+                  {CardInner}
+                </a>
+              ) : (
+                <div key={w.id} className="rounded-xl overflow-hidden border border-gray-100 group">
+                  {CardInner}
                 </div>
-              </div>
-              <div className="p-4">
-                <h3 className="font-semibold text-gray-900 text-sm mb-1">{w.title}</h3>
-                <p className="text-gray-400 text-xs">{w.tag}</p>
-              </div>
-            </div>
-          ))}
-        </div>
-        <div className="mt-8 text-center">
-          <a
-            href={workshopsLink}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex items-center justify-center rounded-xl bg-violet-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-violet-200 transition hover:bg-violet-700 hover:shadow-violet-300"
-          >
-            View Workshop Schedule & Register
-          </a>
+              );
+            })
+          )}
         </div>
       </div>
     </section>
