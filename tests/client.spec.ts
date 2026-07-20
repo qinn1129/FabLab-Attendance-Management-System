@@ -104,7 +104,7 @@ async function mockBrowserDate(page: Page, isoDate: string) {
 async function fillStudentPersonalDetails(page: Page) {
 	await page.getByPlaceholder('Juan dela Cruz').fill('QA Student');
 	await page.getByPlaceholder('name@dlsu.edu.ph').fill('qa.student@dlsu.edu.ph');
-	await page.getByPlaceholder('+63 9xx xxx xxxx').fill('+63 912 345 6789');
+	await page.getByPlaceholder('09123456789').fill('09123456789');
 
 	await page.locator('select').nth(0).selectOption('DLSU Student');
 	await page.locator('input[type="checkbox"]').check();
@@ -118,7 +118,7 @@ async function fillStudentPersonalDetails(page: Page) {
 async function fillOutsiderPersonalDetails(page: Page, email = 'qa.outsider@example.com') {
 	await page.getByPlaceholder('Juan dela Cruz').fill('QA Outsider');
 	await page.getByPlaceholder('name@dlsu.edu.ph').fill(email);
-	await page.getByPlaceholder('+63 9xx xxx xxxx').fill('+63 912 345 6789');
+	await page.getByPlaceholder('09123456789').fill('09123456789');
 
 	await page.locator('select').nth(0).selectOption('Outsider');
 	await page.getByPlaceholder(/Company \/ School \/ Organization/i).fill('QA Outsider Org');
@@ -129,7 +129,7 @@ async function fillOutsiderPersonalDetails(page: Page, email = 'qa.outsider@exam
 async function fillFacultyPersonalDetails(page: Page) {
 	await page.getByPlaceholder('Juan dela Cruz').fill('QA Faculty');
 	await page.getByPlaceholder('name@dlsu.edu.ph').fill('qa.faculty@dlsu.edu.ph');
-	await page.getByPlaceholder('+63 9xx xxx xxxx').fill('+63 912 345 6789');
+	await page.getByPlaceholder('09123456789').fill('09123456789');
 
 	await page.locator('select').nth(0).selectOption('Faculty');
 	await page.getByPlaceholder(/Software Technology/i).fill('Software Technology');
@@ -408,7 +408,7 @@ test.describe('Client Portal Tests', () => {
 
 		await page.getByPlaceholder('Juan dela Cruz').fill('Invalid Email User');
 		await page.getByPlaceholder('name@dlsu.edu.ph').fill('not-an-email');
-		await page.getByPlaceholder('+63 9xx xxx xxxx').fill('+63 912 345 6789');
+		await page.getByPlaceholder('09123456789').fill('09123456789');
 
 		await page.locator('select').nth(0).selectOption('Outsider');
 		await page.getByPlaceholder(/Company \/ School \/ Organization/i).fill('QA Org');

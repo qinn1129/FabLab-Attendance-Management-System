@@ -30,7 +30,7 @@ export function ClientPortal({
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [form, setForm] = useState({
-    name: "", email: "", clientType: "DLSU Student",
+    name: "", email: "", clientType: "",
     contactNumber: "",
     affiliation: "",
     isDlsuStudent: true,
@@ -63,9 +63,13 @@ export function ClientPortal({
     ? "ID number must be exactly 8 digits."
     : "";
 
-  const phoneRegex = /^[+()\-\s\d]{7,}$/;
+  const clientTypeError = !form.clientType.trim()
+    ? "Please select a client type."
+    : "";
+
+  const phoneRegex = /^\d{11}$/;
   const contactError = form.contactNumber.trim() && !phoneRegex.test(form.contactNumber.trim())
-    ? "Please enter a valid contact number."
+    ? "Contact number must be exactly 11 digits."
     : "";
 
   const purposeOtherError = form.purpose === "Others" && !form.purposeOther.trim()
@@ -86,14 +90,14 @@ export function ClientPortal({
     if (step === 1) {
       if (!form.name.trim() || !form.email.trim()) return false;
       if (emailError) return false;
+      if (!form.clientType.trim()) return false;
       if (!form.contactNumber.trim() || contactError) return false;
       
       if (form.clientType === "DLSU Student") {
-        if (!form.isDlsuStudent) return false;
         if (!form.idNumber.trim() || !form.program.trim() || !form.college) return false;
         if (idError) return false;
       } else if (form.clientType === "Non-DLSU Student") {
-        if (!form.affiliation.trim()) return false;
+        if (!form.program.trim() || !form.affiliation.trim()) return false;
       } else if (form.clientType === "Faculty") {
         if (!form.department.trim()) return false;
       } else if (form.clientType === "Outsider") {
@@ -302,10 +306,13 @@ export function ClientPortal({
                   <Input
                     label="Contact Number"
                     value={form.contactNumber}
-                    onChange={v => setForm({ ...form, contactNumber: v })}
-                    placeholder="+63 9xx xxx xxxx"
+                    onChange={v => setForm({ ...form, contactNumber: v.replace(/\D/g, "").slice(0, 11) })}
+                    placeholder="09123456789"
                     required
                     error={contactError}
+                    maxLength={11}
+                    inputMode="numeric"
+                    pattern="\d{11}"
                   />
                   <Select
                     label="Client Type"
@@ -318,45 +325,39 @@ export function ClientPortal({
                         affiliation: "",
                         idNumber: "",
                         program: "",
+                        college: "CCS",
                         department: "",
                       })
                     }
                     options={["DLSU Student", "Non-DLSU Student", "Faculty", "Outsider"]}
+                    required
+                    error={clientTypeError}
                   />
                 </div>
 
                 {form.clientType === "DLSU Student" && (
-                  <>
-                    <label className="flex items-center gap-2 select-none cursor-pointer p-1 animate-in fade-in duration-200">
-                      <input
-                        type="checkbox"
-                        checked={form.isDlsuStudent}
-                        onChange={e => setForm({ ...form, isDlsuStudent: e.target.checked })}
-                        className="w-4 h-4 rounded border-gray-300 text-violet-600 focus:ring-violet-400"
-                      />
-                      <span className="text-sm font-semibold text-gray-800">
-                        I verify that I am a student of De La Salle University (DLSU) *
-                      </span>
-                    </label>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 animate-in fade-in duration-200">
-                      <Input
-                        label="ID Number"
-                        value={form.idNumber}
-                        onChange={v => setForm({ ...form, idNumber: v })}
-                        placeholder="e.g. 12012345"
-                        required
-                        error={idError}
-                      />
-                      <Input label="Program" value={form.program} onChange={v => setForm({ ...form, program: v })} placeholder="e.g. BSCS-ST" required />
-                      <Select label="College" value={form.college} onChange={v => setForm({ ...form, college: v })} options={["CCS", "GCOE", "CLA", "COS", "RVRCOB", "BAGCED", "SOE"]} />
-                    </div>
-                  </>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 animate-in fade-in duration-200">
+                    <Input
+                      label="ID Number"
+                      value={form.idNumber}
+                      onChange={v => setForm({ ...form, idNumber: v.replace(/\D/g, "").slice(0, 8) })}
+                      placeholder="e.g. 12012345"
+                      required
+                      error={idError}
+                      maxLength={8}
+                      inputMode="numeric"
+                      pattern="\d{8}"
+                    />
+                    <Input label="Program" value={form.program} onChange={v => setForm({ ...form, program: v })} placeholder="e.g. BSCS-ST" required />
+                    <Select label="College" value={form.college} onChange={v => setForm({ ...form, college: v })} options={["CCS", "GCOE", "CLA", "COS", "RVRCOB", "BAGCED", "SOE"]} required />
+                  </div>
                 )}
 
                 {form.clientType === "Non-DLSU Student" && (
-                  <div className="animate-in fade-in duration-200">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-in fade-in duration-200">
+                    <Input label="Program" value={form.program} onChange={v => setForm({ ...form, program: v })} placeholder="e.g. BSCS-ST" required />
                     <Input
-                      label="College / University Name"
+                      label="University"
                       value={form.affiliation}
                       onChange={v => setForm({ ...form, affiliation: v })}
                       placeholder="e.g. Ateneo de Manila University"
@@ -404,13 +405,13 @@ export function ClientPortal({
                     {[
                       {
                         id: "3D Printing With File",
-                        name: "3D Printing W/File",
+                        name: "3D Printing With File",
                         desc: "Print using your own STL/OBJ design files.",
                         image: "https://images.unsplash.com/photo-1615840287214-7fe58a8f668f?w=600&auto=format&fit=crop"
                       },
                       {
                         id: "3D Printing Without File (Modelling Needed)",
-                        name: "3D Printing W/O File",
+                        name: "3D Printing Without File",
                         desc: "Have an idea but no 3D model? We'll model and print it.",
                         image: "https://images.unsplash.com/photo-1531525645387-7f14be1bdbbd?w=600&auto=format&fit=crop"
                       },
@@ -616,12 +617,17 @@ export function ClientPortal({
                     <div><p className="text-gray-500 text-xs mb-1">Name</p><p className="font-semibold text-gray-900">{form.name || "—"}</p></div>
                     <div><p className="text-gray-500 text-xs mb-1">Client Type</p><p className="font-semibold text-gray-900">{form.clientType || "—"}</p></div>
                     <div><p className="text-gray-500 text-xs mb-1">Contact Number</p><p className="font-semibold text-gray-900">{form.contactNumber || "—"}</p></div>
-                    <div><p className="text-gray-500 text-xs mb-1">DLSU Client</p><p className="font-semibold text-gray-900">{form.isDlsuStudent ? "Yes" : "No"}</p></div>
-                    {(form.clientType === "Outsider" || form.clientType === "Non-DLSU Student") && (
+                    {form.clientType === "Outsider" && (
                       <div>
-                        <p className="text-gray-500 text-xs mb-1">Affiliation / College</p>
+                        <p className="text-gray-500 text-xs mb-1">Affiliation</p>
                         <p className="font-semibold text-gray-900">{form.affiliation || "—"}</p>
                       </div>
+                    )}
+                    {form.clientType === "Non-DLSU Student" && (
+                      <>
+                        <div><p className="text-gray-500 text-xs mb-1">Program</p><p className="font-semibold text-gray-900">{form.program || "—"}</p></div>
+                        <div><p className="text-gray-500 text-xs mb-1">University</p><p className="font-semibold text-gray-900">{form.affiliation || "—"}</p></div>
+                      </>
                     )}
                     {form.clientType === "DLSU Student" && (
                       <>
