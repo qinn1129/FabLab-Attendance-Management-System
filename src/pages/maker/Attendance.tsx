@@ -57,6 +57,23 @@ function parseTimeStringToSlots(timeStr: string): Record<number, boolean> {
   return selected;
 }
 
+ function formatRangeTo12H(rangeStr: string): string {
+   const parts = rangeStr.split("-");
+   if (parts.length !== 2) return rangeStr;
+   const convert = (time: string) => {
+     const tParts = time.split(":");
+     if (tParts.length !== 2) return time;
+     let hrs = parseInt(tParts[0], 10);
+     const mins = parseInt(tParts[1], 10);
+     if (isNaN(hrs) || isNaN(mins)) return time;
+     const ampm = hrs >= 12 ? "PM" : "AM";
+     hrs = hrs % 12;
+     if (hrs === 0) hrs = 12;
+     return `${hrs}:${String(mins).padStart(2, "0")} ${ampm}`;
+   };
+   return `${convert(parts[0])} - ${convert(parts[1])}`;
+ }
+
 function serializeSlotsToTimeString(selected: Record<number, boolean>): string {
   const sortedSlots = Object.keys(selected)
     .map(Number)
@@ -133,7 +150,7 @@ export function MakerAttendance({
   const [activeSession, setActiveSession] = useState<AttendanceLog | null>(null);
   const [loadingSession, setLoadingSession] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
-  const [tab, setTab] = useState<"clock"|"schedule"|"request">("clock");
+  const [tab, setTab] = useState<"clock"|"schedule"|"team"|"request">("clock");
 
   // Load and check active session on mount
   useEffect(() => {
@@ -369,6 +386,31 @@ export function MakerAttendance({
     };
   }, []);
 
+ const [teamMakers, setTeamMakers] = useState<Account[]>([]);
+ const [teamScheds, setTeamScheds] = useState<Record<string, Record<string, string>>>({});
+ const [loadingTeam, setLoadingTeam] = useState(false);
+
+ useEffect(() => {
+   if (tab !== "team") return;
+   setLoadingTeam(true);
+   Promise.all([
+     accountsService.fetchResidentMakers(),
+     sheetsService.fetchWeeklySchedules()
+   ]).then(([makers, scheds]) => {
+     setTeamMakers(makers.filter(m => m.status === "Active"));
+     const byId: Record<string, Record<string, string>> = {};
+     scheds.forEach(s => {
+       byId[s.resident_ID] = {
+         Monday: s.Monday || "", Tuesday: s.Tuesday || "", Wednesday: s.Wednesday || "",
+         Thursday: s.Thursday || "", Friday: s.Friday || "", Saturday: s.Saturday || "", Sunday: s.Sunday || "",
+       };
+     });
+     setTeamScheds(byId);
+   }).catch(err => {
+     console.error("Error loading team schedules", err);
+   }).finally(() => setLoadingTeam(false));
+ }, [tab]);
+
   const handleSlotMouseDown = (slotMins: number) => {
     setIsMouseDown(true);
     const newMode = !selectedSlots[slotMins] ? "select" : "deselect";
@@ -463,9 +505,9 @@ export function MakerAttendance({
     <div className="p-6">
       <PageHeader title="Attendance System" sub="Track your time and manage schedules" />
       <div className="flex gap-1 p-1 bg-muted rounded-lg w-fit mb-5">
-        {(["clock","schedule","request"] as const).map(t => (
+        {(["clock","schedule","team","request"] as const).map(t => (
           <button key={t} onClick={() => setTab(t)} className={cn("px-4 py-1.5 rounded-md text-sm font-medium transition", tab === t ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-card-foreground")}>
-            {t === "clock" ? "Time In/Out" : t === "schedule" ? "My Schedule" : "Attendance Request"}
+            {t === "clock" ? "Time In/Out" : t === "schedule" ? "My Schedule" : t === "team" ? "Team Schedules" : "Attendance Request"}
           </button>
         ))}
       </div>
@@ -692,6 +734,75 @@ export function MakerAttendance({
           <button onClick={submitRequest} className="mt-5 w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2.5 rounded-xl transition">
             Submit Request
           </button>
+        </div>
+      )}
+      {tab === "team" && (
+        <div className="w-full">
+          {loadingTeam ? (
+            <div className="text-center py-8 text-muted-foreground text-sm bg-card border border-border rounded-xl">
+              Loading team schedules...
+            </div>
+          ) : teamMakers.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground text-sm bg-card border border-border rounded-xl">
+              No other active Resident Makers found.
+            </div>
+          ) : (
+            <div className="bg-card rounded-xl border border-border overflow-hidden">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-muted border-b border-border">
+                    <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">
+                      Resident Maker
+                    </th>
+                    {["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].map(d => (
+                      <th key={d} className="text-center px-3 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">{d}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {teamMakers.map(rm => {
+                    const sched = teamScheds[rm.id] || {};
+                    const isMe = rm.id === account.id;
+                    return (
+                      <tr key={rm.id} className={cn("border-b border-muted transition", isMe ? "bg-emerald-500/5" : "hover:bg-muted/50")}>
+                        <td className="px-4 py-3 align-top whitespace-nowrap">
+                          <span className="font-semibold text-foreground">{rm.firstName} {rm.lastName}</span>
+                          {isMe && <span className="ml-1.5 text-[10px] text-emerald-600 font-bold">(You)</span>}
+                          <span className="block text-[10px] text-muted-foreground font-normal">{rm.program || "—"}</span>
+                        </td>
+                        {["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"].map(fullDay => {
+                          const val = sched[fullDay] || "";
+                          const hasValue = val.trim() !== "";
+                          if (!hasValue) {
+                            return (
+                              <td key={fullDay} className="px-2 py-3 align-top">
+                                <div className="w-full max-w-[110px] h-[28px] rounded-lg border border-dashed border-border/50 bg-muted/15 mx-auto" />
+                              </td>
+                            );
+                          }
+                          const slots = val.split(",");
+                          return (
+                            <td key={fullDay} className="px-2 py-3 align-top">
+                              <div className="flex flex-col gap-1 items-center">
+                                {slots.map((slot, i) => (
+                                  <span
+                                    key={i}
+                                    className="text-[9px] font-mono font-semibold px-1.5 py-1 rounded-md bg-purple-500/10 border border-purple-200 dark:border-purple-800 text-purple-950 dark:text-purple-100 whitespace-nowrap"
+                                  >
+                                    {formatRangeTo12H(slot)}
+                                  </span>
+                                ))}
+                              </div>
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       )}
     </div>

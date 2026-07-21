@@ -3,6 +3,7 @@ import { X, Send, MessageCircle, MessageSquare, Megaphone } from "lucide-react";
 import { chatService, type ChatMessage } from "../../services/chatService";
 import { accountsService } from "../../services/accountsService";
 import { cn } from "../../lib/utils";
+import { formatChatTimestamp } from "../../lib/dateFormat";
 
 /**
  * Props for the ChatWidget component.

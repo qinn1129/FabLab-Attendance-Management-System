@@ -18,10 +18,10 @@ export function MakerCommissions({
   onUpdate: (id: string, updates: Partial<Commission>) => Promise<void>; 
   makerName: string; 
 }) {
-  // Make all approved commissions visible to the Resident Maker
-  const approvedComms = commissions.filter(
-    c => c.status === "In Progress" || c.status === "Completed" || c.status === "Pending"
-  );
+
+   const approvedComms = commissions.filter(
+     c => c.rm === makerName && (c.status === "In Progress" || c.status === "Completed" || c.status === "Pending")
+   );
 
   const [editId, setEditId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<{
@@ -64,36 +64,27 @@ export function MakerCommissions({
 
   return (
     <div className="p-6">
-      <PageHeader title="Approved Commissions" sub={`Fabrication queue · Welcome, ${makerName}`} />
+      <PageHeader title="My Commissions" sub={`${approvedComms.length} assigned to you`} />
       <div className="space-y-4">
 
         {approvedComms.length === 0 ? (
           <div className="bg-card rounded-xl border border-border p-12 text-center">
             <Package className="w-10 h-10 text-muted-foreground/30 mx-auto mb-3" />
-            <p className="text-muted-foreground">No approved commissions in the queue yet.</p>
+            <p className="text-muted-foreground">You have no assigned commissions yet.</p>
           </div>
         ) : approvedComms.map(c => {
           const isEditing = editId === c.id;
-          const isAssignedToMe = c.rm === makerName;
 
           return (
             <div 
               key={c.id} 
-              className={cn(
-                "bg-card rounded-xl border p-5 transition-all",
-                isAssignedToMe ? "border-emerald-500/30 shadow-sm shadow-emerald-500/5" : "border-border"
-              )}
+              className="bg-card rounded-xl border border-emerald-500/30 shadow-sm shadow-emerald-500/5 p-5 transition-all"
             >
               <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 mb-4">
                 <div>
                   <div className="flex items-center gap-2 mb-2">
                     <span className="font-mono text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">{c.id}</span>
                     <span className="font-semibold text-foreground text-sm">{c.client}</span>
-                    {isAssignedToMe && (
-                      <span className="text-[10px] bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 font-bold px-2 py-0.5 rounded-full">
-                        Assigned to Me
-                      </span>
-                    )}
                   </div>
 
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-1.5 text-xs text-muted-foreground">

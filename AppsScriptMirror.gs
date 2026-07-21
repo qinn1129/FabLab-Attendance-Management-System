@@ -94,7 +94,7 @@ function getOrCreateSheet(ss, name) {
                 "id", "role", "firstName", "lastName", "email",
                 "passwordHash", "salt", "status",
                 "program", "year", "schedule", "hoursWeek", "totalHours",
-                "createdAt", "description", "hobbies", "motto"
+                "createdAt", "description", "hobbies", "motto", "profilePicture"
             ];
             sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
         } else if (name === "weeklyScheds") {

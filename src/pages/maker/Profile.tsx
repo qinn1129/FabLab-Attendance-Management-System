@@ -1,6 +1,8 @@
 import React, { useState } from "react";
 import { PageHeader, Input, Select, ChangePasswordForm } from "../../components/common";
 import { accountsService, type Account } from "../../services/accountsService";
+import { Camera } from "lucide-react";
+import { resizeImageToDataUrl, MAX_PROFILE_PICTURE_BYTES } from "../../lib/imageUpload";
 
 export function MakerProfile({
   account,
@@ -17,9 +19,39 @@ export function MakerProfile({
     description: account.description || "",
     hobbies: account.hobbies || "",
     motto: account.motto || "",
+    profilePicture: account.profilePicture || "",
   });
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState("");
+  const [photoError, setPhotoError] = useState("");
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+
+    const handlePhotoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      e.target.value = ""; // allow re-selecting the same file later
+      if (!file) return;
+      setPhotoError("");
+      setUploadingPhoto(true);
+      try {
+        const dataUrl = await resizeImageToDataUrl(file);
+        if (dataUrl.length > MAX_PROFILE_PICTURE_BYTES) {
+          setPhotoError("Image is too large even after compression. Try a smaller photo.");
+          return;
+        }
+        const updated = { ...form, profilePicture: dataUrl };
+        setForm(updated);
+        const result = await accountsService.updateAccount(account.id, { profilePicture: dataUrl });
+        if (!result.success) {
+          setPhotoError(result.error || "Failed to save photo.");
+          return;
+        }
+        onAccountUpdate({ ...account, profilePicture: dataUrl });
+      } catch (err) {
+        setPhotoError(err instanceof Error ? err.message : "Failed to process image.");
+      } finally {
+        setUploadingPhoto(false);
+      }
+    };
 
    const handleSave = async () => {
      setSaving(true);
@@ -39,9 +71,33 @@ export function MakerProfile({
       <PageHeader title="My Profile" sub="Your RM account and personal information" />
       <div className="bg-card rounded-xl border border-border p-6 max-w-lg">
         <div className="flex items-center gap-4 mb-6">
-          <div className="w-16 h-16 rounded-2xl bg-emerald-500 flex items-center justify-center text-white text-xl font-bold">
-            {form.firstName[0]}{form.lastName[0]}
-          </div>
+           <div className="relative w-16 h-16 flex-shrink-0">
+             {form.profilePicture ? (
+               <img
+                 src={form.profilePicture}
+                 alt={`${form.firstName} ${form.lastName}`}
+                 className="w-16 h-16 rounded-2xl object-cover border border-border"
+               />
+             ) : (
+               <div className="w-16 h-16 rounded-2xl bg-emerald-600 flex items-center justify-center text-white text-xl font-bold">
+                 {form.firstName[0]}{form.lastName[0]}
+               </div>
+             )}
+             <label
+               htmlFor="admin-profile-photo"
+               className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-card border border-border flex items-center justify-center cursor-pointer hover:bg-muted transition shadow-sm"
+               title="Change profile picture"
+             >
+               <Camera className="w-3 h-3 text-foreground" />
+             </label>
+             <input
+               id="admin-profile-photo"
+               type="file"
+               accept="image/*"
+               onChange={handlePhotoSelect}
+               className="hidden"
+             />
+           </div>
           <div>
             <p className="text-lg font-bold text-card-foreground">{form.firstName} {form.lastName}</p>
             <p className="text-muted-foreground text-sm">{form.program || "No program set"} · {form.year || "—"}</p>
@@ -51,6 +107,9 @@ export function MakerProfile({
             </div>
           </div>
         </div>
+
+        {uploadingPhoto && <p className="text-muted-foreground text-xs mb-3">Uploading photo...</p>}
+        {photoError && <p className="text-red-500 text-xs mb-3">{photoError}</p>}
 
         <div className="space-y-3">
           <div className="grid grid-cols-2 gap-3">

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Plus, Trash2, Edit2, Check, X, GripVertical } from "lucide-react";
+import { Plus, Trash2, Edit2, Check, X, ArrowUp, ArrowDown } from "lucide-react";
 import { PageHeader, Input, Select } from "../../components/common";
 import { servicesService, type ServiceOffering } from "../../services/servicesService";
 import { SERVICE_ICON_OPTIONS, getServiceIcon } from "../../constants/serviceIcons";
@@ -152,7 +152,7 @@ export function AdminServices() {
                 ) : (
                   <div className="flex items-center gap-4">
                     <div className="flex flex-col gap-1 flex-shrink-0">
-                      <button onClick={() => moveItem(s.id, "up")} disabled={i === 0} className="p-0.5 text-muted-foreground hover:text-foreground disabled:opacity-20 transition"><GripVertical className="w-3.5 h-3.5 rotate-90" /></button>
+                      <button onClick={() => moveItem(s.id, "up")} disabled={i === 0} title="Move up" className="p-0.5 text-muted-foreground hover:text-foreground disabled:opacity-20 transition"><ArrowUp className="w-3.5 h-3.5" /></button>
                     </div>
                     <div className="w-10 h-10 rounded-lg bg-violet-50 flex items-center justify-center flex-shrink-0">
                       <Icon className="w-5 h-5 text-violet-600" />
@@ -162,7 +162,7 @@ export function AdminServices() {
                       <p className="text-muted-foreground text-xs mt-0.5">{s.desc}</p>
                     </div>
                     <div className="flex gap-1.5 flex-shrink-0">
-                      <button onClick={() => moveItem(s.id, "down")} disabled={i === items.length - 1} className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition disabled:opacity-20">↓</button>
+                      <button onClick={() => moveItem(s.id, "down")} disabled={i === items.length - 1} title="Move down" className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition disabled:opacity-20"><ArrowDown className="w-3.5 h-3.5" /></button>
                       <button onClick={() => startEdit(s)} className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition"><Edit2 className="w-3.5 h-3.5" /></button>
                       <button onClick={() => deleteItem(s.id)} className="p-1.5 text-muted-foreground hover:text-red-500 hover:bg-red-500/10 rounded-lg transition"><Trash2 className="w-3.5 h-3.5" /></button>
                     </div>

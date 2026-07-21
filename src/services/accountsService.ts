@@ -14,6 +14,7 @@ export interface Account {
   description?: string;
   hobbies?: string;
   motto?: string;
+  profilePicture?: string;
 }
 
 // const LOCAL_STORAGE_KEY = "fablab_accounts_v1";

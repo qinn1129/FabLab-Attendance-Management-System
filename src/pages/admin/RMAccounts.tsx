@@ -126,6 +126,16 @@ export function AdminRMAccounts() {
     loadData();
   };
 
+    const handleReactivate = async (id: string) => {
+      setActionError("");
+      const result = await accountsService.updateAccount(id, { status: "Active" });
+      if (!result.success) {
+        setActionError(result.error || "Failed to reactivate account.");
+        return;
+      }
+      loadData();
+    };
+
   const handleApproveRequest = async (requestId: string) => {
     setActionError("");
     try {
@@ -190,6 +200,8 @@ export function AdminRMAccounts() {
                       <button onClick={() => handleApprove(rm.id)} className="text-xs text-emerald-600 hover:text-emerald-700 font-medium">Approve</button>
                     ) : rm.status === "Active" ? (
                       <button onClick={() => handleDeactivate(rm.id)} className="text-xs text-red-500 hover:text-red-600 font-medium">Deactivate</button>
+                    ) : rm.status === "Inactive" ? (
+                      <button onClick={() => handleReactivate(rm.id)} className="text-xs text-emerald-600 hover:text-emerald-700 font-medium">Reactivate</button>
                     ) : (
                       <span className="text-xs text-muted-foreground italic">—</span>
                     )}
