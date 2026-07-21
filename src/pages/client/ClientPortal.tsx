@@ -244,7 +244,7 @@ export function ClientPortal({
         <header className="px-6 py-4 flex items-center justify-between border-b border-gray-100">
           <div className="flex items-center gap-2">
             <span className="w-8 h-8 rounded-xl bg-violet-600 flex items-center justify-center text-white font-bold text-lg">F</span>
-            <span className="font-bold text-gray-900 text-lg tracking-tight">FabLab</span>
+            <span className="font-bold text-gray-900 text-lg tracking-tight">Animo Labs - DLSU Science Foundation Inc.</span>
           </div>
           <button onClick={onBack} className="text-gray-500 hover:text-gray-900 text-sm font-medium transition">Back to Home</button>
         </header>
@@ -257,7 +257,7 @@ export function ClientPortal({
           <TestimonialsSection />
         </main>
         <footer className="bg-gray-900 text-white/50 text-center py-8 text-sm">
-          <p>© 2026 Animo Labs FabLab. All rights reserved.</p>
+          <p>© 2026 Animo Labs - DLSU Science Foundation Inc.. All rights reserved.</p>
         </footer>
       </div>
     );
@@ -664,7 +664,7 @@ export function ClientPortal({
                   )}
                 </div>
                 <div className="p-4 bg-blue-50 text-blue-800 text-sm rounded-xl border border-blue-100">
-                  By submitting this request, you agree to the Animo Labs FabLab terms of service and material costs. An RM will review your file and email you a quote.
+                  By submitting this request, you agree to the Animo Labs - DLSU Science Foundation Inc. terms of service and material costs. Your request will be reviewed, and an automated email will be sent to confirm your order.
                 </div>
               </div>
             )}
