@@ -73,6 +73,11 @@ function setup_workshops() {
   getOrCreateSheet(ss, "workshops");
 }
 
+function setup_testimonials() {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  getOrCreateSheet(ss, "testimonials");
+}
+
 function getOrCreateSheet(ss, name) {
     let sheet = ss.getSheetByName(name);
     if (!sheet) {
@@ -132,7 +137,10 @@ function getOrCreateSheet(ss, name) {
         } else if (name === "workshops") {
             const headers = ["id", "title", "date", "tag", "image", "link", "order", "createdAt"];
             sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
-    }
+        } else if (name === "testimonials") {
+            const headers = ["id", "name", "program", "text", "stars", "status", "submittedAt", "shownCount"];
+            sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+        }
     return sheet;
 }
 }

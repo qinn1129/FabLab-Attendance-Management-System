@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Boxes, Presentation } from "lucide-react";
-import { ChevronRight, LogOut, BarChart2, Calendar, CheckCircle, Package, Layers, Bell, Book, Users, User, HelpCircle } from "lucide-react";
+import { ChevronRight, LogOut, BarChart2, Calendar, CheckCircle, Package, Layers, Bell, Book, Users, User, HelpCircle, MessageSquareQuote } from "lucide-react";
 import { ChatWidget } from "../components/common/ChatWidget";
 import { ThemeToggle } from "../components/common";
 import { cn } from "../lib/utils";
@@ -16,6 +16,7 @@ export const ADMIN_NAV = [
   { id: "services", label: "Service Offerings", icon: Boxes },
   { id: "workshops", label: "Workshops", icon: Presentation },
   { id: "tasks", label: "Task Assignment", icon: Layers },
+  { id: "testimonials", label: "Testimonials", icon: MessageSquareQuote },
   { id: "announcements", label: "Announcements & Chat", icon: Bell },
   { id: "modules", label: "Modules", icon: Book },
   { id: "rm-accounts", label: "RM Accounts", icon: Users },

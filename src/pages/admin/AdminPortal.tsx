@@ -17,6 +17,7 @@ import { rememberMe } from "../../lib/rememberMe";
 import { type Commission } from "../../services/sheetsService";
 import { AdminServices } from "./Services";
 import { AdminWorkshops } from "./Workshops";
+import { AdminTestimonials } from "./Testimonials";
 
 
 export function AdminPortal({
@@ -141,6 +142,7 @@ export function AdminPortal({
       case "approvals": return <AdminApprovals commissions={commissions} onUpdate={onUpdate} />;
       case "tracker": return <AdminTracker commissions={commissions} onUpdate={onUpdate} />;
       case "tasks": return <AdminTasks />;
+      case "testimonials": return <AdminTestimonials />;
       case "announcements": return <AdminAnnouncements />;
       case "modules": return <AdminModules />;
       case "rm-accounts": return <AdminRMAccounts />;
