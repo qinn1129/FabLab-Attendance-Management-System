@@ -10,7 +10,6 @@ import { cn } from "../lib/utils";
  */
 export const ADMIN_NAV = [
   { id: "dashboard", label: "Dashboard", icon: BarChart2 },
-  { id: "rm-schedules", label: "RM Schedules", icon: Calendar },
   { id: "approvals", label: "Commission Approval", icon: CheckCircle },
   { id: "tracker", label: "Commission Tracker", icon: Package },
   { id: "services", label: "Service Offerings", icon: Boxes },

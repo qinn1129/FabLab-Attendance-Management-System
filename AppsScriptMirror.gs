@@ -78,6 +78,11 @@ function setup_testimonials() {
   getOrCreateSheet(ss, "testimonials");
 }
 
+ function setup_tasks() {
+   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+   getOrCreateSheet(ss, "tasks");
+ }
+
 function getOrCreateSheet(ss, name) {
     let sheet = ss.getSheetByName(name);
     if (!sheet) {
@@ -139,6 +144,9 @@ function getOrCreateSheet(ss, name) {
             sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
         } else if (name === "testimonials") {
             const headers = ["id", "name", "program", "text", "stars", "status", "submittedAt", "shownCount"];
+            sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+        } else if (name === "tasks") {
+            const headers = ["id", "rm_id", "task", "deadline", "status", "source", "createdAt"];
             sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
         }
     return sheet;

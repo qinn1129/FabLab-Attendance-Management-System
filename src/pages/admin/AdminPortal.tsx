@@ -3,7 +3,6 @@ import { Settings } from "lucide-react";
 import { Input } from "../../components/common";
 import { AdminLayout } from "../../layouts/AdminLayout";
 import { AdminDashboard } from "./Dashboard";
-import { AdminRMSchedules } from "./RMSchedules";
 import { AdminApprovals } from "./Approvals";
 import { AdminTracker } from "./Tracker";
 import { AdminTasks } from "./Tasks";
@@ -138,7 +137,6 @@ export function AdminPortal({
   const renderScreen = () => {
     switch (screen) {
       case "dashboard": return <AdminDashboard commissions={commissions} />;
-      case "rm-schedules": return <AdminRMSchedules />;
       case "approvals": return <AdminApprovals commissions={commissions} onUpdate={onUpdate} />;
       case "tracker": return <AdminTracker commissions={commissions} onUpdate={onUpdate} />;
       case "tasks": return <AdminTasks />;

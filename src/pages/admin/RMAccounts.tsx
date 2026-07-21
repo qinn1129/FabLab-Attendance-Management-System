@@ -215,11 +215,14 @@ export function AdminRMAccounts() {
       )}
 
       {tab === "schedules" && (
+        <>
         <div className="bg-card rounded-xl border border-border overflow-hidden">
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-muted border-b border-border">
-                <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">Resident Maker</th>
+               <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">Resident Maker</th>
+               <th className="text-center px-3 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">Hrs/Week</th>
+               <th className="text-center px-3 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">Total Hrs</th>
                 {["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].map(d => (
                   <th key={d} className="text-center px-4 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">{d}</th>
                 ))}
@@ -227,9 +230,9 @@ export function AdminRMAccounts() {
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={8} className="px-4 py-6 text-center text-muted-foreground text-sm">Loading schedules...</td></tr>
+                <tr><td colSpan={10} className="px-4 py-6 text-center text-muted-foreground text-sm">Loading schedules...</td></tr>
               ) : accounts.length === 0 ? (
-                <tr><td colSpan={8} className="px-4 py-6 text-center text-muted-foreground text-sm">No Resident Makers yet.</td></tr>
+                <tr><td colSpan={10} className="px-4 py-6 text-center text-muted-foreground text-sm">No Resident Makers yet.</td></tr>
               ) : accounts.map(rm => {
                 const sched = weeklyScheds.find(s => s.resident_ID === rm.id);
                 return (
@@ -238,6 +241,8 @@ export function AdminRMAccounts() {
                       {rm.firstName} {rm.lastName}
                       <span className="block text-[10px] text-muted-foreground font-normal">{rm.email}</span>
                     </td>
+                    <td className="px-3 py-3 text-center font-mono font-semibold text-card-foreground align-middle">{Number(rm.hoursWeek) || 0}h</td>
+                    <td className="px-3 py-3 text-center font-mono text-muted-foreground align-middle">{Number(rm.totalHours) || 0}h</td>
                     {["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].map(d => {
                       const fullDay = dayMap[d];
                       const val = sched ? sched[fullDay] : "";
@@ -276,6 +281,31 @@ export function AdminRMAccounts() {
             </tbody>
           </table>
         </div>
+        <div className="bg-card rounded-xl border border-border p-5">
+         <h3 className="text-sm font-semibold text-card-foreground mb-3">RM Progress Overview</h3>
+         <div className="space-y-3">
+           {accounts.map(rm => {
+             const totalHours = Number(rm.totalHours) || 0;
+             return (
+               <div key={rm.id} className="flex items-center gap-3">
+                 <div className="w-7 h-7 rounded-full bg-emerald-500/20 flex items-center justify-center flex-shrink-0">
+                   <span className="text-emerald-500 text-xs font-bold">{rm.firstName[0]}{rm.lastName[0]}</span>
+                 </div>
+                 <div className="flex-1 min-w-0">
+                   <div className="flex justify-between items-center mb-1">
+                     <span className="text-sm text-card-foreground font-medium truncate">{rm.firstName} {rm.lastName}</span>
+                     <span className="text-xs font-mono text-muted-foreground ml-2">{totalHours}h total</span>
+                   </div>
+                   <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                     <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${Math.min((totalHours / 400) * 100, 100)}%` }} />
+                   </div>
+                 </div>
+               </div>
+             );
+           })}
+         </div>
+       </div>
+       </>
       )}
 
       {/*For requests*/}
