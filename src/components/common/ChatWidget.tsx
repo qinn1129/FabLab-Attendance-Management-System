@@ -39,14 +39,6 @@ function initialsFor(name: string | undefined | null): string {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
-function formatTime(iso: string): string {
-  try {
-    return new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-  } catch {
-    return "";
-  }
-}
-
 /** Escapes a string for safe use inside a RegExp. */
 function escapeRegExp(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -479,7 +471,7 @@ export function ChatWidget({ accentColor = "emerald", senderName, senderRole }: 
                     <div className={cn("max-w-[68%] rounded-2xl px-3 py-1.5 text-sm", mine ? bubbleMine : "bg-card border border-border text-card-foreground")}>
                       {!mine && <div className="text-[10px] font-semibold text-muted-foreground mb-0.5">{m.sender}</div>}
                       <p className="leading-snug whitespace-pre-wrap break-words">{renderMessageText(m.text, mine)}</p>
-                      <div className={cn("text-[10px] mt-0.5", mine ? "text-white/60" : "text-muted-foreground")}>{formatTime(m.createdAt)}</div>
+                      <div className={cn("text-[10px] mt-0.5", mine ? "text-white/60" : "text-muted-foreground")}>{formatChatTimestamp(m.createdAt)}</div>
                     </div>
                   </div>
                 );
