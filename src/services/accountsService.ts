@@ -1,3 +1,5 @@
+import { RESIDENT_MAKERS } from "../constants/mockData";
+
 export interface Account {
   id: string;
   role: "Admin" | "ResidentMaker";
@@ -168,7 +170,28 @@ export const accountsService = {
   /** Convenience wrapper — fetches only Resident Maker accounts. */
   async fetchResidentMakers(): Promise<Account[]> {
     const accounts = await this.fetchAccounts();
-    return accounts.filter(a => a.role === "ResidentMaker");
+    const rms = accounts.filter(a => a.role === "ResidentMaker");
+    if (rms.length > 0) return rms;
+
+    // Fallback to mock resident makers for local dev / offline mode
+    return RESIDENT_MAKERS.map(rm => {
+      const nameParts = rm.name.split(" ");
+      const firstName = nameParts[0] || "";
+      const lastName = nameParts.slice(1).join(" ") || "";
+      return {
+        id: `RM-${rm.id}`,
+        role: "ResidentMaker",
+        firstName,
+        lastName,
+        email: rm.email,
+        status: (rm.status as Account["status"]) || "Active",
+        program: rm.program,
+        year: String(rm.year),
+        hoursWeek: rm.hoursWeek,
+        totalHours: rm.totalHours,
+        schedule: JSON.stringify(rm.schedule)
+      };
+    });
   },
 
     /** Re-hashes and stores a new password server-side after verifying the old one. */

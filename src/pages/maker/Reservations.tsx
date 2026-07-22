@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useRef } from "react";
-import { 
-  Calendar as CalendarIcon, 
-  Clock, 
-  Cpu, 
-  Trash2, 
-  AlertTriangle, 
-  CheckCircle2, 
-  Info, 
+import {
+  Calendar as CalendarIcon,
+  Clock,
+  Cpu,
+  Trash2,
+  AlertTriangle,
+  CheckCircle2,
+  Info,
   RefreshCw,
   MapPin,
   ChevronLeft,
@@ -23,10 +23,10 @@ import { accountsService, type Account } from "../../services/accountsService";
 
 // Calendar constants
 const START_HOUR = 7;
-const END_HOUR = 22; // 10 PM
+const END_HOUR = 18; // 6 PM
 const HOUR_HEIGHT = 60; // 1 hour = 60px (1 minute = 1px)
-const TOTAL_HOURS = END_HOUR - START_HOUR; // 15 hours
-const GRID_HEIGHT = TOTAL_HOURS * HOUR_HEIGHT; // 900px
+const TOTAL_HOURS = END_HOUR - START_HOUR; // 11 hours
+const GRID_HEIGHT = TOTAL_HOURS * HOUR_HEIGHT; // 660px
 
 // List of hours for Y-axis and grid lines
 const HOURS_ARRAY = Array.from({ length: TOTAL_HOURS + 1 }, (_, i) => START_HOUR + i);
@@ -96,14 +96,14 @@ export function MakerReservations({ account }: { account: Account }) {
   const [machines, setMachines] = useState<Machine[]>([]);
   const [reservations, setReservations] = useState<MachineReservation[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
-  
+
   // Selection states
   const [selectedMachineId, setSelectedMachineId] = useState<string>("");
   const [currentWeekStart, setCurrentWeekStart] = useState<Date>(getMonday(new Date()));
-  
+
   // Interactive draft selection state
   const [draftReservation, setDraftReservation] = useState<{ dayIndex: number; startMins: number; endMins: number } | null>(null);
-  
+
   // Interaction tracker
   const [activeInteraction, setActiveInteraction] = useState<InteractionState | null>(null);
 
@@ -129,11 +129,11 @@ export function MakerReservations({ account }: { account: Account }) {
         sheetsService.fetchReservations(),
         accountsService.fetchAccounts()
       ]);
-      
+
       setMachines(fetchedMachines);
       setReservations(fetchedReservations);
       setAccounts(fetchedAccounts);
-      
+
       if (fetchedMachines.length > 0 && !selectedMachineId) {
         setSelectedMachineId(fetchedMachines[0].id);
       }
@@ -172,7 +172,7 @@ export function MakerReservations({ account }: { account: Account }) {
       const start = new Date(r.start_time);
       const end = new Date(r.end_time);
       const dayIndex = getDayIndexForDate(start);
-      
+
       const startMins = start.getHours() * 60 + start.getMinutes();
       const endMins = end.getHours() * 60 + end.getMinutes();
 
@@ -233,7 +233,7 @@ export function MakerReservations({ account }: { account: Account }) {
 
     const columnEl = e.currentTarget;
     const startMins = getMinsFromClientY(e.clientY, columnEl);
-    
+
     // Check if clicked exactly on top of an existing booking
     const overlaps = visibleReservations.find(r => r.dayIndex === dayIndex && startMins >= r.startMins && startMins < r.endMins);
     if (overlaps) return;
@@ -397,7 +397,7 @@ export function MakerReservations({ account }: { account: Account }) {
         const currentMins = getMinsFromClientY(e.clientY, currentColumnEl);
         const minEnd = activeInteraction.anchorMins + 15; // Minimum 15-minute reservation
         const finalEnd = Math.max(minEnd, Math.min(1320, currentMins));
-        
+
         if (activeInteraction.resId) {
           setReservations(prev => prev.map(r => {
             if (r.reservation_id === activeInteraction.resId) {
@@ -424,7 +424,7 @@ export function MakerReservations({ account }: { account: Account }) {
         const gridRect = gridContainerRef.current.getBoundingClientRect();
         const clientX = e.clientX;
         const gridWidth = gridRect.width;
-        
+
         // Find which column is being hovered
         const relativeX = clientX - gridRect.left;
         let hoveredDay = Math.floor(relativeX / (gridWidth / 7));
@@ -479,7 +479,7 @@ export function MakerReservations({ account }: { account: Account }) {
     if (!draftReservation) return;
     setErrorMsg("");
     setSuccessMsg("");
-    
+
     const targetDate = weekDates[draftReservation.dayIndex];
     const sHour = Math.floor(draftReservation.startMins / 60);
     const sMin = draftReservation.startMins % 60;
@@ -498,8 +498,8 @@ export function MakerReservations({ account }: { account: Account }) {
     // Double-check overlaps inside visible week
     const overlap = visibleReservations.find(r => {
       return r.dayIndex === draftReservation.dayIndex &&
-             draftReservation.startMins < r.endMins &&
-             draftReservation.endMins > r.startMins;
+        draftReservation.startMins < r.endMins &&
+        draftReservation.endMins > r.startMins;
     });
 
     if (overlap) {
@@ -550,12 +550,12 @@ export function MakerReservations({ account }: { account: Account }) {
 
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6 select-none">
-      <PageHeader 
-        title="Machine Reservation Calendar" 
+      <PageHeader
+        title="Machine Reservation Calendar"
         sub="Drag and resize to create or edit machine bookings"
         action={
-          <button 
-            onClick={loadData} 
+          <button
+            onClick={loadData}
             disabled={loading}
             className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-border bg-card text-foreground hover:bg-muted text-sm font-semibold transition shadow-sm"
           >
@@ -586,7 +586,7 @@ export function MakerReservations({ account }: { account: Account }) {
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 items-start">
-          
+
           {/* Machine selector (Sidebar - left) */}
           <div className="lg:col-span-1 bg-card rounded-2xl border border-border p-5 space-y-4">
             <h3 className="font-semibold text-foreground text-base flex items-center gap-2">
@@ -606,7 +606,7 @@ export function MakerReservations({ account }: { account: Account }) {
                     }}
                     className={cn(
                       "w-full text-left p-4 rounded-xl border transition-all flex flex-col gap-1",
-                      isSelected 
+                      isSelected
                         ? "bg-purple-500/10 border-purple-500 text-purple-950 dark:text-purple-100 shadow-sm"
                         : "bg-background border-border text-foreground hover:bg-muted/50"
                     )}
@@ -630,7 +630,7 @@ export function MakerReservations({ account }: { account: Account }) {
 
           {/* Interactive Weekly Grid Container */}
           <div className="lg:col-span-3 space-y-4">
-            
+
             {/* Header & Date / Navigation Filter Controls */}
             <div className="bg-card rounded-2xl border border-border p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
               <div className="flex items-center gap-3">
@@ -646,16 +646,16 @@ export function MakerReservations({ account }: { account: Account }) {
                     <option key={m.id} value={m.id}>{m["Machine Model"]}</option>
                   ))}
                 </select>
-                
+
                 <div className="flex items-center gap-1">
-                  <button 
+                  <button
                     onClick={handlePrevWeek}
                     className="p-2 rounded-lg border border-border bg-background hover:bg-muted text-foreground transition"
                     title="Previous Week"
                   >
                     <ChevronLeft className="w-4 h-4" />
                   </button>
-                  <button 
+                  <button
                     onClick={handleNextWeek}
                     className="p-2 rounded-lg border border-border bg-background hover:bg-muted text-foreground transition"
                     title="Next Week"
@@ -667,7 +667,7 @@ export function MakerReservations({ account }: { account: Account }) {
 
               <div className="flex items-center gap-3 w-full sm:w-auto">
                 <span className="text-xs text-muted-foreground font-semibold uppercase tracking-wider hidden md:inline">Week starting:</span>
-                <input 
+                <input
                   type="date"
                   value={getLocalDateString(currentWeekStart)}
                   onChange={e => handleDateChange(e.target.value)}
@@ -678,13 +678,13 @@ export function MakerReservations({ account }: { account: Account }) {
 
             {/* Calendar Grid Box */}
             <div className="bg-card rounded-2xl border border-border overflow-hidden shadow-sm flex flex-col">
-              
+
               {/* Header row: Days list */}
               <div className="grid grid-cols-[80px_repeat(7,1fr)] bg-muted text-foreground border-b border-border/80 text-center font-bold text-xs select-none">
                 <div className="p-3 border-r border-border/60 text-muted-foreground flex items-center justify-center">Time</div>
                 {weekDates.map((date, idx) => (
-                  <div 
-                    key={idx} 
+                  <div
+                    key={idx}
                     className={cn(
                       "p-3 border-r border-border/60 last:border-r-0 flex flex-col gap-0.5",
                       getLocalDateString(date) === getLocalDateString(new Date()) && "bg-purple-500/10 text-purple-900 dark:text-purple-100"
@@ -698,16 +698,16 @@ export function MakerReservations({ account }: { account: Account }) {
 
               {/* Scrollable Viewport */}
               <div className="max-h-[600px] overflow-y-auto relative w-full flex" style={{ contentVisibility: "auto" }}>
-                
+
                 {/* Y-axis hour labels */}
                 <div className="w-[80px] flex-shrink-0 bg-muted/30 border-r border-border select-none relative font-mono text-[10px] text-muted-foreground" style={{ height: `${GRID_HEIGHT}px` }}>
                   {HOURS_ARRAY.map((hour, idx) => (
-                    <div 
-                      key={hour} 
+                    <div
+                      key={hour}
                       className="absolute left-0 right-0 border-b border-border/40 text-center flex items-start justify-center pt-1"
-                      style={{ 
-                        top: `${idx * HOUR_HEIGHT}px`, 
-                        height: `${HOUR_HEIGHT}px` 
+                      style={{
+                        top: `${idx * HOUR_HEIGHT}px`,
+                        height: `${HOUR_HEIGHT}px`
                       }}
                     >
                       {String(hour).padStart(2, "0")}:00
@@ -716,17 +716,17 @@ export function MakerReservations({ account }: { account: Account }) {
                 </div>
 
                 {/* Main 7 Columns grid container */}
-                <div 
+                <div
                   ref={gridContainerRef}
-                  className="flex-1 grid grid-cols-7 relative overflow-hidden" 
+                  className="flex-1 grid grid-cols-7 relative overflow-hidden"
                   style={{ height: `${GRID_HEIGHT}px` }}
                 >
-                  
+
                   {/* Background grid horizontal lines */}
                   <div className="absolute inset-0 pointer-events-none z-0">
                     {HOURS_ARRAY.map((_, idx) => (
-                      <div 
-                        key={idx} 
+                      <div
+                        key={idx}
                         className="absolute left-0 right-0 border-b border-border/30"
                         style={{ top: `${idx * HOUR_HEIGHT}px`, height: `${HOUR_HEIGHT}px` }}
                       />
@@ -736,14 +736,14 @@ export function MakerReservations({ account }: { account: Account }) {
                   {/* Rendering the daily column contents */}
                   {weekDates.map((_, dayIndex) => {
                     const dayReservations = visibleReservations.filter(r => r.dayIndex === dayIndex);
-                    
+
                     return (
                       <div
                         key={dayIndex}
                         className="grid-column relative h-full border-r border-border/30 last:border-r-0 z-10"
                         onMouseDown={e => handleColumnMouseDown(e, dayIndex)}
                       >
-                        
+
                         {/* Reservation blocks */}
                         {dayReservations.map(res => {
                           const topPos = (res.startMins - START_HOUR * 60);
@@ -762,13 +762,13 @@ export function MakerReservations({ account }: { account: Account }) {
                                 className={cn(
                                   "res-block absolute left-1 right-1 rounded-xl border-2 border-dashed border-purple-600 bg-purple-500/10 text-purple-950 dark:text-purple-100 shadow-lg z-30 transition-all"
                                 )}
-                                style={{ 
-                                  top: `${topPos}px`, 
-                                  height: `${blockHeight}px` 
+                                style={{
+                                  top: `${topPos}px`,
+                                  height: `${blockHeight}px`
                                 }}
                               >
                                 {/* Top drag zone (Move): 65% of the block height */}
-                                <div 
+                                <div
                                   className="absolute top-0 left-0 right-0 h-[65%] cursor-move flex flex-col justify-between p-2 pb-0"
                                   onMouseDown={(e) => handleMoveMousedown(e, res)}
                                 >
@@ -784,7 +784,7 @@ export function MakerReservations({ account }: { account: Account }) {
                                 </div>
 
                                 {/* Bottom drag zone (Resize): 35% of the block height */}
-                                <div 
+                                <div
                                   className="absolute bottom-0 left-0 right-0 h-[35%] cursor-ns-resize flex items-end justify-center pb-1 hover:bg-purple-600/15 transition rounded-b-xl"
                                   onMouseDown={(e) => handleResizeMousedown(e, res)}
                                 >
@@ -831,15 +831,15 @@ export function MakerReservations({ account }: { account: Account }) {
                                   ? "bg-muted/80 border-border/80 text-muted-foreground select-none"
                                   : "border-purple-200 text-purple-950 dark:text-purple-100 dark:border-purple-800"
                               )}
-                              style={{ 
-                                top: `${topPos}px`, 
-                                height: `${blockHeight}px` 
+                              style={{
+                                top: `${topPos}px`,
+                                height: `${blockHeight}px`
                               }}
                               title={`${selectedMachine?.["Machine Model"]} - ${formattedTime} (by ${makerName})`}
                             >
                               <div className="flex items-start justify-between gap-1.5 w-full overflow-hidden">
                                 <span className="font-bold truncate select-none leading-none pt-1">
-                                  {isLocked ? "Unavailable" : makerName}
+                                  {makerName}
                                 </span>
                                 {isLocked ? (
                                   <Lock className="w-3.5 h-3.5 flex-shrink-0 opacity-60 mt-0.5" />
@@ -882,7 +882,7 @@ export function MakerReservations({ account }: { account: Account }) {
                               }}
                             >
                               {/* Top Resize Handle */}
-                              <div 
+                              <div
                                 className="resize-handle absolute top-0 left-0 right-0 h-2.5 cursor-ns-resize flex items-center justify-center hover:bg-purple-600/30 rounded-t-md transition"
                                 onMouseDown={e => {
                                   e.preventDefault();
@@ -934,7 +934,7 @@ export function MakerReservations({ account }: { account: Account }) {
                               </div>
 
                               {/* Bottom Resize Handle */}
-                              <div 
+                              <div
                                 className="resize-handle absolute bottom-0 left-0 right-0 h-2.5 cursor-ns-resize flex items-center justify-center hover:bg-purple-600/30 rounded-b-md transition"
                                 onMouseDown={e => {
                                   e.preventDefault();
@@ -951,7 +951,7 @@ export function MakerReservations({ account }: { account: Account }) {
                             </div>
                           );
                         })()}
-                        
+
                       </div>
                     );
                   })}
@@ -1001,9 +1001,9 @@ export function MakerReservations({ account }: { account: Account }) {
             <div className="p-4 bg-muted/40 border border-border/80 rounded-2xl flex gap-3 text-xs text-muted-foreground leading-relaxed">
               <Info className="w-4 h-4 text-purple-600 flex-shrink-0 mt-0.5" />
               <div>
-                <strong>Weekly Grid Tips:</strong> Click and drag vertically in any empty column to define a new reservation. 
-                Use the handles on the top or bottom of your selection to fine-tune the timeslot (snaps to 15-minute intervals). 
-                You can drag and drop your existing bookings (marked with a <Pencil className="w-3 h-3 inline text-purple-600" /> icon) to relocate them to other hours or days. 
+                <strong>Weekly Grid Tips:</strong> Click and drag vertically in any empty column to define a new reservation.
+                Use the handles on the top or bottom of your selection to fine-tune the timeslot (snaps to 15-minute intervals).
+                You can drag and drop your existing bookings (marked with a <Pencil className="w-3 h-3 inline text-purple-600" /> icon) to relocate them to other hours or days.
                 Reservations made by other makers are locked (<Lock className="w-3 h-3 inline text-muted-foreground" />) and cannot be rescheduled.
               </div>
             </div>

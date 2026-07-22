@@ -16,7 +16,7 @@ const dayMap: Record<string, string> = {
 };
 
 const TIME_SLOTS: number[] = [];
-for (let h = 7; h < 22; h++) {
+for (let h = 7; h < 18; h++) {
   TIME_SLOTS.push(h * 60);
   TIME_SLOTS.push(h * 60 + 30);
 }
