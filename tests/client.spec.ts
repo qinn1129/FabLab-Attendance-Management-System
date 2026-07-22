@@ -176,6 +176,8 @@ async function fillCommissionDetails(
 	page: Page,
 	options: {
 		color?: string;
+		selectedColor?: string;
+		selectedColors?: string[];
 		filament?: string;
 		weight?: string;
 		driveLink?: string | null;
@@ -183,12 +185,21 @@ async function fillCommissionDetails(
 		pickupDate?: string;
 	} = {},
 ) {
-	const color = options.color ?? 'Single Color';
-	if (color === 'Single Color' || color === 'Multi-Color') {
-		await page.locator('select').nth(0).selectOption(color);
+	const colorMode = options.color ?? 'Single Color';
+
+	if (colorMode === 'Single Color') {
+		await page.locator('select').nth(0).selectOption('Single Color');
+		await page.locator('select').nth(2).selectOption(options.selectedColor ?? 'Black');
+	} else if (colorMode === 'Multi-Color') {
+		await page.locator('select').nth(0).selectOption('Multi-Color');
+
+		const selectedColors = options.selectedColors ?? ['Black', 'White'];
+		for (const color of selectedColors) {
+			await page.getByRole('button', { name: color, exact: true }).click();
+		}
 	} else {
 		await page.locator('select').nth(0).selectOption('Others');
-		await page.getByPlaceholder(/e.g. Gold/i).fill(color);
+		await page.getByPlaceholder(/e.g. Gold/i).fill(colorMode);
 	}
 
 	await page.locator('select').nth(1).selectOption(options.filament ?? 'PLA');
@@ -198,7 +209,9 @@ async function fillCommissionDetails(
 		await page.locator('input[type="number"]').fill(options.weight);
 	}
 
-	await page.getByPlaceholder(/Dimensions/i).fill(options.notes ?? 'This is a QA test commission request.');
+	await page.getByPlaceholder(/Dimensions/i).fill(
+		options.notes ?? 'This is a QA test commission request.',
+	);
 
 	if (options.driveLink !== null) {
 		await page
@@ -207,12 +220,22 @@ async function fillCommissionDetails(
 	}
 }
 
-async function fill3DPrintingDetails(page: Page, options?: { weight?: string; driveLink?: string | null }) {
+async function fill3DPrintingDetails(
+	page: Page,
+	options?: {
+		weight?: string;
+		driveLink?: string | null;
+		selectedColor?: string;
+	},
+) {
 	await page.locator('select').nth(0).selectOption('Single Color');
 	await page.locator('select').nth(1).selectOption('PLA');
+	await page.locator('select').nth(2).selectOption(options?.selectedColor ?? 'Black');
 	await page.locator('input[type="date"]').fill(dateDaysFromNow(7));
 	await page.locator('input[type="number"]').fill(options?.weight ?? '200');
-	await page.getByPlaceholder(/Dimensions/i).fill('This is a QA test commission request.');
+	await page.getByPlaceholder(/Dimensions/i).fill(
+		'This is a QA test commission request.',
+	);
 
 	if (options?.driveLink !== null) {
 		await page
@@ -418,7 +441,7 @@ test.describe('Client Portal Tests', () => {
 		await expect(reviewSection).toContainText('CCS');
 		await expect(reviewSection).toContainText('3D Printing With File');
 		await expect(reviewSection).toContainText('Academic / Thesis');
-		await expect(reviewSection).toContainText('Single Color (PLA)');
+		await expect(reviewSection).toContainText('Black (PLA)');
 		await expect(reviewSection).toContainText('200 g');
 
 		await page.getByRole('button', { name: /Submit Request/i }).click();
@@ -542,7 +565,7 @@ test.describe('Client Portal Tests', () => {
 		await expect(page.getByText('Software Technology')).toBeVisible();
 		await expect(page.getByText(/Modelling Only/i)).toBeVisible();
 		await expect(page.getByText(/Research/i)).toBeVisible();
-		await expect(page.getByText(/Single Color \(PLA\)/i)).toBeVisible();
+		await expect(page.getByText(/Black \(PLA\)/i)).toBeVisible();
 		await page.getByRole('button', { name: /Submit Request/i }).click();
 		await expect(page.getByRole('heading', { name: /Request Submitted/i })).toBeVisible();
 	});
@@ -727,7 +750,7 @@ test.describe('Client Portal Tests', () => {
 		await goToServiceSelection(page);
 		await select3DPrintingWithFile(page);
 		await page.locator('select').nth(0).selectOption('Single Color');
-		await page.locator('select').nth(1).selectOption('PLA');
+		await page.locator('select').nth(2).selectOption('Black');
 		await page.locator('input[type="date"]').fill(dateDaysFromNow(7));
 		await page.locator('input[type="number"]').fill('200');
 		await page.getByPlaceholder(/Dimensions/i).fill('QA checks the file-link workflow.');
@@ -826,26 +849,62 @@ test.describe('Client Portal Tests', () => {
 		await expect(page.getByText(/maximum of 3 concurrent active commissions/i)).toBeVisible();
 	});
 
-	test('TC-029 - purpose of commission cannot remain Select before continuing', async ({ page }) => {
-		test.fail(true, 'Known validation mismatch: a blank Purpose of Commission does not currently disable Next Step.');
-
+	test('TC-029 - purpose defaults to Academic Thesis and Others requires an explanation', async ({ page }) => {
 		await openCommissionForm(page);
 		await fillOutsiderPersonalDetails(page);
 		await goToServiceSelection(page);
 
-		await page.getByRole('button', { name: /Modelling Only/i }).click();
-
 		const purposeSelect = page.locator('select').nth(0);
 		const nextButton = page.getByRole('button', { name: /Next Step/i });
 
-		await expect(purposeSelect).toHaveValue('');
+		await expect(purposeSelect).toHaveValue('Academic / Thesis');
 		await expect(nextButton).toBeDisabled();
-		await expect(page.getByRole('heading', { name: /Service Selection/i })).toBeVisible();
 
-		await purposeSelect.selectOption('Academic / Thesis');
+		await page.getByRole('button', { name: /Modelling Only/i }).click();
+		await expect(nextButton).toBeEnabled();
+
+		await purposeSelect.selectOption('Others');
+		await expect(page.getByPlaceholder(/Type your purpose/i)).toBeVisible();
+		await expect(nextButton).toBeDisabled();
+
+		await page.getByPlaceholder(/Type your purpose/i).fill('QA custom purpose');
+		await expect(nextButton).toBeEnabled();
+	});
+
+	test('TC-030 - single and multi-color selections are required and displayed on Review', async ({ page }) => {
+		await openCommissionForm(page);
+		await fillOutsiderPersonalDetails(page);
+		await goToServiceSelection(page);
+		await selectServiceAndPurpose(page, /NFC Keychains/i, 'Personal Project');
+
+		const nextButton = page.getByRole('button', { name: /Next Step/i });
+
+		await page.locator('input[type="date"]').fill(dateDaysFromNow(7));
+
+		// Single Color requires one actual color.
+		await expect(page.getByText(/Please select a color/i)).toBeVisible();
+		await expect(nextButton).toBeDisabled();
+
+		await page.locator('select').nth(2).selectOption('Black');
+		await expect(nextButton).toBeEnabled();
+
+		// Switching to Multi-Color clears the previous single-color choice.
+		await page.locator('select').nth(0).selectOption('Multi-Color');
+		await expect(page.getByText(/Please select at least one color/i)).toBeVisible();
+		await expect(nextButton).toBeDisabled();
+
+		// Multi-Color allows a maximum of three selected colors.
+		await page.getByRole('button', { name: 'Red', exact: true }).click();
+		await page.getByRole('button', { name: 'Blue', exact: true }).click();
+		await page.getByRole('button', { name: 'Green', exact: true }).click();
+
+		await expect(page.getByText('3/3 selected')).toBeVisible();
+		await expect(page.getByText(/Maximum of 3 colors can be selected/i)).toBeVisible();
+		await expect(page.getByRole('button', { name: 'Yellow', exact: true })).toBeDisabled();
 		await expect(nextButton).toBeEnabled();
 
 		await nextButton.click();
-		await expect(page.getByRole('heading', { name: /Commission Details/i })).toBeVisible();
+		await expect(page.getByRole('heading', { name: /Review Your Request/i })).toBeVisible();
+		await expect(page.getByText(/Red, Blue, Green \(PLA\)/i)).toBeVisible();
 	});
 });
