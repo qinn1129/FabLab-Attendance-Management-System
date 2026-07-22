@@ -36,7 +36,7 @@ export function ClientPortal({
     isDlsuStudent: true,
     idNumber: "", program: "", college: "CCS", department: "",
     service: "", purpose: "Academic / Thesis", purposeOther: "",
-    color: "Single Color", colorOther: "", filament: "PLA", expectedPickupDate: "", notes: "",
+    color: "Single Color", selectedColor: "", selectedColors: [] as string[], colorOther: "", filament: "PLA", expectedPickupDate: "", notes: "",
     pickupOption: "JGIC 201 Pickup (Laguna Campus)",
     driveLink: "",
     weight: 200,
@@ -76,6 +76,19 @@ export function ClientPortal({
     ? "Please specify your purpose."
     : "";
 
+  const colorOptions = ["Black", "White", "Red", "Blue", "Green", "Yellow", "Orange", "Purple", "Pink", "Gray", "Brown", "Transparent"];
+  const materialColor = form.color === "Single Color"
+    ? form.selectedColor
+    : form.color === "Multi-Color"
+      ? form.selectedColors.join(", ")
+      : form.colorOther;
+
+  const colorSelectionError = form.color === "Single Color" && !form.selectedColor
+    ? "Please select a color."
+    : form.color === "Multi-Color" && form.selectedColors.length === 0
+      ? "Please select at least one color."
+      : "";
+
   const colorOtherError = form.color === "Others" && !form.colorOther.trim()
     ? "Please specify your preferred color."
     : "";
@@ -112,6 +125,7 @@ export function ClientPortal({
     }
     if (step === 3) {
       if (!form.isWeightNA && (form.weight <= 0 || form.weight > 1000)) return false;
+      if (colorSelectionError) return false;
       if (colorOtherError) return false;
       if (driveLinkError) return false;
       if (!form.expectedPickupDate) return false;
@@ -159,7 +173,7 @@ export function ClientPortal({
         service: form.service,
         purpose: form.purpose,
         purposeOther: form.purposeOther,
-        color: form.color,
+        color: `${form.color}${materialColor ? `: ${materialColor}` : ""}`,
         colorOther: form.colorOther,
         filament: form.filament,
         expectedPickupDate: form.expectedPickupDate,
@@ -508,7 +522,7 @@ export function ClientPortal({
                   <Select
                     label="Preferred Color"
                     value={form.color}
-                    onChange={v => setForm({ ...form, color: v })}
+                    onChange={v => setForm({ ...form, color: v, selectedColor: "", selectedColors: [], colorOther: "" })}
                     options={["Single Color", "Multi-Color", "Others"]}
                   />
                   <Select
@@ -518,6 +532,59 @@ export function ClientPortal({
                     options={["PLA", "ABS", "PETG", "TPU", "ASA", "Not Sure"]}
                   />
                 </div>
+                {form.color === "Single Color" && (
+                  <Select
+                    label="Selected Color"
+                    value={form.selectedColor}
+                    onChange={v => setForm({ ...form, selectedColor: v })}
+                    options={colorOptions}
+                    required
+                    error={colorSelectionError}
+                  />
+                )}
+
+                {form.color === "Multi-Color" && (
+                  <div className="space-y-2 animate-in fade-in duration-200">
+                    <div className="flex items-center justify-between gap-2">
+                      <label className="text-sm font-medium text-gray-700">Multi-selected Color <span className="text-red-500 ml-0.5">*</span></label>
+                      <span className="text-xs text-gray-500">{form.selectedColors.length}/3 selected</span>
+                    </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                      {colorOptions.map(color => {
+                        const isSelected = form.selectedColors.includes(color);
+                        const isDisabled = !isSelected && form.selectedColors.length >= 3;
+                        return (
+                          <button
+                            key={color}
+                            type="button"
+                            onClick={() => {
+                              if (isSelected) {
+                                setForm({ ...form, selectedColors: form.selectedColors.filter(c => c !== color) });
+                              } else if (form.selectedColors.length < 3) {
+                                setForm({ ...form, selectedColors: [...form.selectedColors, color] });
+                              }
+                            }}
+                            disabled={isDisabled}
+                            className={`px-3 py-2 rounded-lg border text-sm font-medium transition ${
+                              isSelected
+                                ? "border-violet-600 bg-violet-50 text-violet-700 ring-2 ring-violet-400/20"
+                                : isDisabled
+                                  ? "border-gray-100 bg-gray-50 text-gray-300 cursor-not-allowed"
+                                  : "border-gray-200 bg-white text-gray-700 hover:border-violet-300 hover:bg-violet-50/40"
+                            }`}
+                          >
+                            {color}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {colorSelectionError && <p className="text-xs text-red-500 font-medium">{colorSelectionError}</p>}
+                    {form.selectedColors.length >= 3 && (
+                      <p className="text-xs text-gray-500">Maximum of 3 colors can be selected.</p>
+                    )}
+                  </div>
+                )}
+
                 {form.color === "Others" && (
                   <Input
                     label="Specify Color"
@@ -643,7 +710,7 @@ export function ClientPortal({
                     <div>
                       <p className="text-gray-500 text-xs mb-1">Material</p>
                       <p className="font-semibold text-gray-900">
-                        {form.color === "Others" ? form.colorOther : form.color} ({form.filament})
+                        {materialColor || form.color} ({form.filament})
                       </p>
                     </div>
                     <div>
