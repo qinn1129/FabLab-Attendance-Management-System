@@ -17,6 +17,7 @@ import { type Commission } from "../../services/sheetsService";
 import { AdminServices } from "./Services";
 import { AdminWorkshops } from "./Workshops";
 import { AdminTestimonials } from "./Testimonials";
+import { AdminMachineStatus } from "./MachineStatus";
 
 
 export function AdminPortal({
@@ -148,6 +149,7 @@ export function AdminPortal({
       case "faq": return <AdminFAQ />;
       case "services": return <AdminServices />;
       case "workshops": return <AdminWorkshops />;
+      case "machines": return <AdminMachineStatus />;
       default: return <AdminDashboard commissions={commissions} />;
     }
   };
