@@ -8,6 +8,7 @@ import { ProgressBar } from "../../components/client/ProgressBar";
 import { Input, Select } from "../../components/common";
 import { sheetsService, type Commission } from "../../services/sheetsService";
 import { sendAdminNotificationEmail, sendClientQueueNotificationEmail } from "../../services/emailService";
+import animoLabLogo from "../../assets/AnimoLabLogo.png";
 
 /**
  * Root component for the Client domain. Handles the landing page and the multi-step commission request form.
@@ -257,7 +258,7 @@ export function ClientPortal({
 
         <header className="px-6 py-4 flex items-center justify-between border-b border-gray-100">
           <div className="flex items-center gap-2">
-            <span className="w-8 h-8 rounded-xl bg-violet-600 flex items-center justify-center text-white font-bold text-lg">F</span>
+            <img src={animoLabLogo} alt="Animo Labs" className="w-10 h-10 object-contain" />
             <span className="font-bold text-gray-900 text-lg tracking-tight">Animo Labs - DLSU Science Foundation Inc.</span>
           </div>
           <button onClick={onBack} className="text-gray-500 hover:text-gray-900 text-sm font-medium transition">Back to Home</button>
