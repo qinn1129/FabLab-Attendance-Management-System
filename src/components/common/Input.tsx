@@ -14,6 +14,8 @@ interface InputProps {
   maxLength?: number;
   inputMode?: React.HTMLAttributes<HTMLInputElement>["inputMode"];
   pattern?: string;
+  min?: string;
+  max?: string;
 }
 
 /**
@@ -21,7 +23,7 @@ interface InputProps {
  * @param {InputProps} props
  * @returns {JSX.Element}
  */
-export function Input({ label, type = "text", value, onChange, placeholder, required, error, maxLength, inputMode, pattern }: InputProps) {
+export function Input({ label, type = "text", value, onChange, placeholder, required, error, maxLength, inputMode, pattern, min, max }: InputProps) {
   return (
     <div className="flex flex-col gap-1">
       {label && <label className="text-sm font-medium text-foreground">{label}{required && <span className="text-red-500 ml-0.5">*</span>}</label>}
@@ -33,9 +35,11 @@ export function Input({ label, type = "text", value, onChange, placeholder, requ
         maxLength={maxLength}
         inputMode={inputMode}
         pattern={pattern}
+        min={min}
+        max={max}
         className={`w-full px-3 py-2 rounded-lg border bg-background text-foreground text-sm outline-none transition focus:ring-2 focus:border-transparent ${
-          error 
-            ? "border-red-500 focus:ring-red-400" 
+          error
+            ? "border-red-500 focus:ring-red-400"
             : "border-border focus:ring-violet-400"
         }`}
       />
