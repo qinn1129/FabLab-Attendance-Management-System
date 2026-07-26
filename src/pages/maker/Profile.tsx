@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { PageHeader, Input, Select, ChangePasswordForm } from "../../components/common";
 import { accountsService, type Account } from "../../services/accountsService";
+import { ALL_DLSU_PROGRAMS } from "../../constants/DLSUPrograms";
 import { Camera } from "lucide-react";
 import { resizeImageToDataUrl, MAX_PROFILE_PICTURE_BYTES } from "../../lib/imageUpload";
 
@@ -116,7 +117,7 @@ export function MakerProfile({
             <Input label="First Name" value={form.firstName} onChange={v => setForm(f => ({ ...f, firstName: v }))} />
             <Input label="Last Name" value={form.lastName} onChange={v => setForm(f => ({ ...f, lastName: v }))} />
           </div>
-          <Select label="Bachelor's Program" value={form.program} onChange={v => setForm(f => ({ ...f, program: v }))} options={["BS Computer Science","BS Computer Engineering","BS Electronics Engineering","BS Mechanical Engineering","BS Industrial Design","BS Information Technology","BS Biology"]} />
+          <Select label="Bachelor's Program" value={form.program} onChange={v => setForm(f => ({ ...f, program: v }))} options={ALL_DLSU_PROGRAMS} />
           <Select label="Year Level" value={form.year} onChange={v => setForm(f => ({ ...f, year: v }))} options={["1st Year","2nd Year","3rd Year","4th Year","5th Year"]} />
           <div className="flex flex-col gap-1">
             <label className="text-sm font-medium text-foreground">Description</label>

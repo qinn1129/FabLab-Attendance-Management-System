@@ -1,16 +1,16 @@
 import React, { useState, useEffect } from "react";
 import { Users, ArrowLeft } from "lucide-react";
-import { Input } from "../../components/common";
+import { Input, Select } from "../../components/common";
 import { MakerLayout } from "../../layouts/MakerLayout";
 import { MakerDashboard } from "./Dashboard";
 import { MakerAttendance } from "./Attendance";
 import { MakerCommissions } from "./Commissions";
 import { MakerResources } from "./Resources";
 import { MakerProfile } from "./Profile";
-import { MakerReservations } from "./Reservations";
 import { accountsService, type Account } from "../../services/accountsService";
 import { rememberMe } from "../../lib/rememberMe";
 import { type Commission } from "../../services/sheetsService";
+import { ALL_DLSU_PROGRAMS } from "../../constants/DLSUPrograms";
 
 export function MakerPortal({
   onBack,
@@ -164,7 +164,7 @@ export function MakerPortal({
                   </div>
                   <Input label="Email Address" type="email" value={regForm.email} onChange={v => setRegForm(f => ({ ...f, email: v }))} placeholder="name@dlsu.edu.ph" required />
                   <div className="grid grid-cols-2 gap-3">
-                    <Input label="Program" value={regForm.program} onChange={v => setRegForm(f => ({ ...f, program: v }))} placeholder="e.g. BS CS" />
+                    <Select label="Program" value={regForm.program} onChange={v => setRegForm(f => ({ ...f, program: v }))} options={ALL_DLSU_PROGRAMS} />
                     <Input label="Year Level" value={regForm.year} onChange={v => setRegForm(f => ({ ...f, year: v }))} placeholder="e.g. 3rd Year" />
                   </div>
                   <Input label="Password" type="password" value={regForm.password} onChange={v => setRegForm(f => ({ ...f, password: v }))} placeholder="At least 8 characters" required />
@@ -228,7 +228,6 @@ export function MakerPortal({
     switch (screen) {
       case "dashboard": return <MakerDashboard commissions={commissions} account={account!} />;
       case "attendance": return <MakerAttendance account={account!} onAccountUpdate={setAccount} />;
-      case "reservations": return <MakerReservations account={account!} />;
       case "commissions": return <MakerCommissions commissions={commissions} onUpdate={onUpdate} makerName={makerName} />;
       case "resources": return <MakerResources />;
       case "profile": return <MakerProfile account={account!} onAccountUpdate={setAccount} />;

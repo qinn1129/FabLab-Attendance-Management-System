@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from "react";
-import { PageHeader, StatusBadge, Input } from "../../components/common";
-import { RESIDENT_MAKERS } from "../../constants/mockData";
+import { PageHeader, StatusBadge, Input, Select } from "../../components/common";
 import { cn } from "../../lib/utils";
 import { accountsService, type Account } from "../../services/accountsService";
 import { sheetsService, type WeeklySchedule, type AttendanceRequest } from "../../services/sheetsService";
-import { Clock } from "lucide-react";
+import { ALL_DLSU_PROGRAMS } from "../../constants/DLSUPrograms";
+import { Clock, AlertTriangle } from "lucide-react";
 
 const dayMap: Record<string, string> = {
   "Mon": "Monday",
@@ -15,6 +15,9 @@ const dayMap: Record<string, string> = {
   "Sat": "Saturday",
   "Sun": "Sunday"
 };
+
+/** Minimum expected hours per week for a Resident Maker. Falling short is flagged in the schedules view. */
+const WEEKLY_MIN_HOURS = 20;
 
 function formatRangeTo12H(rangeStr: string): string {
   const parts = rangeStr.split("-");
@@ -216,6 +219,10 @@ export function AdminRMAccounts() {
 
       {tab === "schedules" && (
         <>
+        <div className="mb-4 p-3 bg-muted/50 border border-border rounded-xl flex items-start gap-2 text-xs text-muted-foreground">
+          <AlertTriangle className="w-3.5 h-3.5 text-amber-500 flex-shrink-0 mt-0.5" />
+          <span>Resident Makers logging fewer than <strong className="text-foreground">{WEEKLY_MIN_HOURS} hours</strong> this week are flagged below the "Hrs/Week" column.</span>
+        </div>
         <div className="bg-card rounded-xl border border-border overflow-hidden">
           <table className="w-full text-sm">
             <thead>
@@ -235,13 +242,25 @@ export function AdminRMAccounts() {
                 <tr><td colSpan={10} className="px-4 py-6 text-center text-muted-foreground text-sm">No Resident Makers yet.</td></tr>
               ) : accounts.map(rm => {
                 const sched = weeklyScheds.find(s => s.resident_ID === rm.id);
+                const hoursWeek = Number(rm.hoursWeek) || 0;
+                const belowMin = hoursWeek < WEEKLY_MIN_HOURS;
                 return (
                   <tr key={rm.id} className="border-b border-muted hover:bg-muted/50 transition">
                     <td className="px-4 py-3 font-semibold text-foreground whitespace-nowrap align-middle">
                       {rm.firstName} {rm.lastName}
                       <span className="block text-[10px] text-muted-foreground font-normal">{rm.email}</span>
                     </td>
-                    <td className="px-3 py-3 text-center font-mono font-semibold text-card-foreground align-middle">{Number(rm.hoursWeek) || 0}h</td>
+                    <td className="px-3 py-3 text-center align-middle">
+                      <div className="flex flex-col items-center gap-1">
+                        <span className="font-mono font-semibold text-card-foreground">{hoursWeek}h</span>
+                        {belowMin && (
+                          <span className="flex items-center gap-1 text-[9px] font-bold text-red-500 bg-red-500/10 border border-red-500/20 rounded px-1.5 py-0.5 whitespace-nowrap">
+                            <AlertTriangle className="w-2.5 h-2.5" />
+                            Below {WEEKLY_MIN_HOURS}h min
+                          </span>
+                        )}
+                      </div>
+                    </td>
                     <td className="px-3 py-3 text-center font-mono text-muted-foreground align-middle">{Number(rm.totalHours) || 0}h</td>
                     {["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].map(d => {
                       const fullDay = dayMap[d];
@@ -366,7 +385,7 @@ export function AdminRMAccounts() {
             <Input label="Email Address" type="email" value={regForm.email} onChange={v => setRegForm(f => ({ ...f, email: v }))} placeholder="name@dlsu.edu.ph" required />
             <Input label="Temporary Password" type="password" value={regForm.password} onChange={v => setRegForm(f => ({ ...f, password: v }))} placeholder="••••••••" required />
             <div className="grid grid-cols-2 gap-3">
-              <Input label="Program" value={regForm.program} onChange={v => setRegForm(f => ({ ...f, program: v }))} placeholder="e.g. BSCS-ST" />
+              <Select label="Program" value={regForm.program} onChange={v => setRegForm(f => ({ ...f, program: v }))} options={ALL_DLSU_PROGRAMS} />
               <Input label="Year Level" value={regForm.year} onChange={v => setRegForm(f => ({ ...f, year: v }))} placeholder="e.g. 3rd Year" />
             </div>
           </div>
