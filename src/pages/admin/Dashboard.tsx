@@ -1,8 +1,16 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { ResponsiveContainer, BarChart as ReBarChart, CartesianGrid, XAxis, YAxis, Tooltip, Bar, PieChart, Pie, Cell } from "recharts";
 import { PageHeader, StatCard, StatusBadge } from "../../components/common";
-import { CHART_COMMISSION, CHART_STATUS } from "../../constants/mockData";
 import { type Commission } from "../../services/sheetsService";
+import { accountsService, type Account } from "../../services/accountsService";
+
+const STATUS_COLORS: Record<string, string> = {
+  "Completed": "#059669",
+  "In Progress": "#3b82f6",
+  "Pending": "#f59e0b",
+  "Awaiting Approval": "#f97316",
+  "Rejected": "#ef4444",
+};
 
 /**
  * Renders the Admin Dashboard overview.
@@ -14,6 +22,37 @@ export function AdminDashboard({ commissions }: { commissions: Commission[] }) {
   const awaitingApproval = commissions.filter(c => c.status === "Awaiting Approval").length;
   const completedComs = commissions.filter(c => c.status === "Completed").length;
 
+  const [makers, setMakers] = useState<Account[]>([]);
+  useEffect(() => {
+    accountsService.fetchAccounts().then(accounts => {
+      setMakers(accounts.filter(a => a.role === "ResidentMaker"));
+    });
+  }, []);
+  const activeRMs = makers.filter(m => m.status === "Active").length;
+  const onLeaveRMs = makers.filter(m => m.status === "On Leave").length;
+
+  const commissionsByWeekday = (() => {
+    const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+    const counts: Record<string, number> = { Sun: 0, Mon: 0, Tue: 0, Wed: 0, Thu: 0, Fri: 0, Sat: 0 };
+    commissions.forEach(c => {
+      const parsed = new Date(c.submitted);
+      if (!isNaN(parsed.getTime())) {
+        counts[dayNames[parsed.getDay()]] += 1;
+      }
+    });
+    // Mon-Sat mirrors the lab's operating week.
+    return ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map(name => ({ name, count: counts[name] }));
+  })();
+
+  const statusBreakdown = (() => {
+    const relevantStatuses = ["Completed", "In Progress", "Pending", "Awaiting Approval"];
+    return relevantStatuses.map(status => ({
+      name: status === "Awaiting Approval" ? "Awaiting" : status,
+      value: commissions.filter(c => c.status === status).length,
+      color: STATUS_COLORS[status] || "#9ca3af",
+    }));
+  })();
+
   return (
     <div className="p-6">
 
@@ -23,21 +62,21 @@ export function AdminDashboard({ commissions }: { commissions: Commission[] }) {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <StatCard label="Total Commissions" value={totalComs} sub="Synced from Sheets" color="text-foreground" />
         <StatCard label="Pending Approval" value={awaitingApproval} sub="Requires action" color="text-orange-500" />
-        <StatCard label="Active RMs" value={4} sub="1 on leave" color="text-emerald-600" />
+        <StatCard label="Active RMs" value={activeRMs} sub={`${onLeaveRMs} on leave`} color="text-emerald-600" />
         <StatCard label="Completed Jobs" value={completedComs} sub="All time" color="text-blue-600" />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 mb-5">
         <div className="lg:col-span-2 bg-card rounded-xl border border-border p-5">
-          <h3 className="text-sm font-semibold text-card-foreground mb-4">Commissions This Week</h3>
+          <h3 className="text-sm font-semibold text-card-foreground mb-4">Commissions by Day Submitted</h3>
 
           <ResponsiveContainer width="100%" height={180}>
 
             {/*The Actual Bar Chart*/}
-            <ReBarChart data={CHART_COMMISSION} barSize={28}>
+            <ReBarChart data={commissionsByWeekday} barSize={28}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
               <XAxis dataKey="name" tick={{ fontSize: 11, fill: "#9ca3af" }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fontSize: 11, fill: "#9ca3af" }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fontSize: 11, fill: "#9ca3af" }} axisLine={false} tickLine={false} allowDecimals={false} />
               <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid #e5e7eb" }} />
               <Bar dataKey="count" fill="#059669" radius={[4, 4, 0, 0]} />
             </ReBarChart>
@@ -49,8 +88,8 @@ export function AdminDashboard({ commissions }: { commissions: Commission[] }) {
           <h3 className="text-sm font-semibold text-card-foreground mb-4">Status Breakdown</h3>
           <ResponsiveContainer width="100%" height={130}>
             <PieChart>
-              <Pie data={CHART_STATUS} cx="50%" cy="50%" innerRadius={40} outerRadius={60} paddingAngle={3} dataKey="value">
-                {CHART_STATUS.map((e, i) => <Cell key={i} fill={e.color} />)}
+              <Pie data={statusBreakdown} cx="50%" cy="50%" innerRadius={40} outerRadius={60} paddingAngle={3} dataKey="value">
+                {statusBreakdown.map((e, i) => <Cell key={i} fill={e.color} />)}
               </Pie>
               <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8 }} />
             </PieChart>
@@ -58,7 +97,7 @@ export function AdminDashboard({ commissions }: { commissions: Commission[] }) {
 
           {/*Legend*/}
           <div className="mt-2 space-y-1">
-            {CHART_STATUS.map(s => (
+            {statusBreakdown.map(s => (
               <div key={s.name} className="flex items-center justify-between text-xs">
                 <div className="flex items-center gap-1.5">
                   <div className="w-2 h-2 rounded-full" style={{ background: s.color }} />
