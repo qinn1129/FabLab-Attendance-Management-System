@@ -164,7 +164,7 @@ def send_announcement_email(
     if not SENDER_APP_PASSWORD:
         raise EmailServiceError(
             "SENDER_APP_PASSWORD is not set. Generate a Gmail App Password at "
-            "https://myaccount.google.com/apppasswords for carljustinesa@gmail.com "
+            "https://myaccount.google.com/apppasswords for roughmage33@gmail.com "
             "and put it in .env."
         )
 
@@ -299,7 +299,7 @@ def send_commission_confirmation_email(
     if not SENDER_APP_PASSWORD:
         raise EmailServiceError(
             "SENDER_APP_PASSWORD is not set. Generate a Gmail App Password at "
-            "https://myaccount.google.com/apppasswords for carljustinesa@gmail.com "
+            "https://myaccount.google.com/apppasswords for roughmage33@gmail.com "
             "and put it in .env."
         )
 
@@ -430,7 +430,7 @@ def send_commission_rejection_email(
     if not SENDER_APP_PASSWORD:
         raise EmailServiceError(
             "SENDER_APP_PASSWORD is not set. Generate a Gmail App Password at "
-            "https://myaccount.google.com/apppasswords for carljustinesa@gmail.com "
+            "https://myaccount.google.com/apppasswords for roughmage33@gmail.com "
             "and put it in .env."
         )
 
@@ -546,7 +546,7 @@ def send_rm_assignment_email(
     if not SENDER_APP_PASSWORD:
         raise EmailServiceError(
             "SENDER_APP_PASSWORD is not set. Generate a Gmail App Password at "
-            "https://myaccount.google.com/apppasswords for carljustinesa@gmail.com "
+            "https://myaccount.google.com/apppasswords for roughmage33@gmail.com "
             "and put it in .env."
         )
 
@@ -568,6 +568,119 @@ def send_rm_assignment_email(
             server.sendmail(SENDER_EMAIL, [rm_email], message.as_string())
     except smtplib.SMTPException as exc:
         raise EmailServiceError(f"Failed to send RM assignment email: {exc}") from exc
+
+    return {"sent": True, "recipients": [rm_email], "failed": []}
+
+
+def _build_rm_unassignment_message(
+    rm_name: str,
+    rm_email: str,
+    commission_id: str,
+    client_name: str,
+    service: str,
+) -> MIMEMultipart:
+    """Build a "you are no longer assigned to this commission" email for a Resident Maker."""
+    subject = f"[FabLab] You have been unassigned from commission {commission_id}"
+
+    text_body = f"""\
+Hi {rm_name},
+
+This is to let you know that commission {commission_id} has been reassigned to a different Resident Maker and is no longer on your queue.
+
+Previous Assignment Details:
+- Commission ID: {commission_id}
+- Client: {client_name}
+- Service: {service}
+
+No action is needed on your part for this commission. If you believe this was done in error, please reach out to an Admin.
+
+— Animo Labs FabLab
+This is an automated notification. Please do not reply to this email.
+"""
+
+    html_body = f"""\
+<html>
+  <body style="font-family: 'Inter', Arial, sans-serif; background:#f8f9fb; padding:24px;">
+    <div style="max-width:560px;margin:0 auto;background:#ffffff;border-radius:16px;
+                border:1px solid #eceef2;overflow:hidden;">
+      <div style="background:#7c2d12;padding:20px 28px;">
+        <p style="color:#ffedd5;font-size:13px;letter-spacing:.05em;text-transform:uppercase;
+                  margin:0;font-family:monospace;">Animo Labs FabLab</p>
+        <p style="color:#ffffff;font-size:18px;font-weight:700;margin:4px 0 0;">
+          Commission Reassigned
+        </p>
+      </div>
+      <div style="padding:28px;">
+        <p style="color:#333;font-size:14px;line-height:1.6;">
+          Hi {rm_name},
+        </p>
+
+        <p style="color:#333;font-size:14px;line-height:1.6;">
+          This is to let you know that commission <strong>{commission_id}</strong> has been reassigned to a different Resident Maker and is no longer on your queue.
+        </p>
+
+        <div style="background:#f1f0f6;border-radius:8px;padding:20px;margin:20px 0;">
+          <p style="color:#0f0f14;font-size:14px;margin:0 0 8px;"><strong>Previous Assignment Details:</strong></p>
+          <p style="color:#333;font-size:13px;margin:4px 0;"><span style="color:#6b6b80;">Commission ID:</span> <span style="font-family:monospace;color:#c2410c;">{commission_id}</span></p>
+          <p style="color:#333;font-size:13px;margin:4px 0;"><span style="color:#6b6b80;">Client:</span> {client_name}</p>
+          <p style="color:#333;font-size:13px;margin:4px 0;"><span style="color:#6b6b80;">Service:</span> {service}</p>
+        </div>
+
+        <p style="color:#333;font-size:14px;line-height:1.6;">
+          No action is needed on your part for this commission. If you believe this was done in error, please reach out to an Admin.
+        </p>
+      </div>
+      <div style="padding:16px 28px;background:#f1f0f6;color:#6b6b80;font-size:12px;">
+        This is an automated notification from the Resident Maker Management System.
+        Please do not reply to this email.
+      </div>
+    </div>
+  </body>
+</html>
+"""
+
+    message = MIMEMultipart("alternative")
+    message["Subject"] = subject
+    message["From"] = f"Animo Labs FabLab <{SENDER_EMAIL}>"
+    message["To"] = rm_email
+    message.attach(MIMEText(text_body, "plain"))
+    message.attach(MIMEText(html_body, "html"))
+    return message
+
+
+def send_rm_unassignment_email(
+    rm_name: str,
+    rm_email: str,
+    commission_id: str,
+    client_name: str,
+    service: str,
+) -> Dict:
+    """Sends a "you've been unassigned" email to the Resident Maker who previously held a reassigned commission."""
+    if not SENDER_APP_PASSWORD:
+        raise EmailServiceError(
+            "SENDER_APP_PASSWORD is not set. Generate a Gmail App Password at "
+            "https://myaccount.google.com/apppasswords for roughmage33@gmail.com "
+            "and put it in .env."
+        )
+
+    if not rm_email:
+        return {"sent": False, "recipients": [], "failed": [], "note": "No RM email provided."}
+
+    message = _build_rm_unassignment_message(
+        rm_name=rm_name,
+        rm_email=rm_email,
+        commission_id=commission_id,
+        client_name=client_name,
+        service=service,
+    )
+
+    context = ssl.create_default_context()
+    try:
+        with smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT, context=context) as server:
+            server.login(SENDER_EMAIL, SENDER_APP_PASSWORD)
+            server.sendmail(SENDER_EMAIL, [rm_email], message.as_string())
+    except smtplib.SMTPException as exc:
+        raise EmailServiceError(f"Failed to send RM unassignment email: {exc}") from exc
 
     return {"sent": True, "recipients": [rm_email], "failed": []}
 
@@ -662,7 +775,7 @@ def send_admin_notification_email(
     if not SENDER_APP_PASSWORD:
         raise EmailServiceError(
             "SENDER_APP_PASSWORD is not set. Generate a Gmail App Password at "
-            "https://myaccount.google.com/apppasswords for carljustinesa@gmail.com "
+            "https://myaccount.google.com/apppasswords for roughmage33@gmail.com "
             "and put it in .env."
         )
 
@@ -791,7 +904,7 @@ def send_client_queue_notification_email(
     if not SENDER_APP_PASSWORD:
         raise EmailServiceError(
             "SENDER_APP_PASSWORD is not set. Generate a Gmail App Password at "
-            "https://myaccount.google.com/apppasswords for carljustinesa@gmail.com "
+            "https://myaccount.google.com/apppasswords for roughmage33@gmail.com "
             "and put it in .env."
         )
 

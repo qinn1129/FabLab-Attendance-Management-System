@@ -176,6 +176,67 @@ export async function sendRMAssignmentEmail(
 }
 
 /**
+ * Sends a "you've been unassigned" email to the Resident Maker who
+ * previously held a now-reassigned commission.
+ * @param rmName - The Resident Maker's full name
+ * @param rmEmail - The Resident Maker's email address
+ * @param commissionId - The commission ID
+ * @param clientName - The client's full name
+ * @param service - The service requested
+ * @returns Promise resolving to success status and response data
+ */
+export async function sendRMUnassignedEmail(
+  rmName: string,
+  rmEmail: string,
+  commissionId: string,
+  clientName: string,
+  service: string,
+): Promise<{ sent: boolean; error?: string }> {
+  if (!rmName || !rmEmail) {
+    return { sent: false, error: "RM name and email are required." };
+  }
+
+  try {
+    const response = await fetch(
+      `${EMAIL_API_BASE_URL}/api/send-rm-unassignment`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          rmName,
+          rmEmail,
+          commissionId,
+          clientName,
+          service,
+        }),
+      },
+    );
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      return {
+        sent: false,
+        error: data.error || "Failed to send RM unassignment email.",
+      };
+    }
+
+    return { sent: true };
+  } catch (error) {
+    console.error(
+      "[emailService] Failed to send RM unassignment email:",
+      error,
+    );
+    return {
+      sent: false,
+      error: error instanceof Error ? error.message : "Network error",
+    };
+  }
+}
+
+/**
  * Sends a notification email to all active Admins when a new commission is submitted.
  * @param clientName - The client's full name
  * @param clientEmail - The client's email address

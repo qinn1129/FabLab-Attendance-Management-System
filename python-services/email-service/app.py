@@ -9,6 +9,7 @@ from email_service import (
     send_admin_notification_email,
     send_client_queue_notification_email,
     send_rm_assignment_email,
+    send_rm_unassignment_email,
 )
 
 app = Flask(__name__)
@@ -118,6 +119,37 @@ def send_rm_assignment():
 
     try:
         result = send_rm_assignment_email(rm_name, rm_email, commission_id, client_name, service)
+    except EmailServiceError as exc:
+        return jsonify({"error": str(exc)}), 502
+
+    return jsonify(result), 200
+
+
+@app.post("/api/send-rm-unassignment")
+def send_rm_unassignment():
+    """
+    Send a "you've been unassigned" email to the RM who previously held a
+    now-reassigned commission.
+    Expected payload: {
+        "rmName": "RM Name",
+        "rmEmail": "rm@example.com",
+        "commissionId": "COM-XXX",
+        "clientName": "Client Name",
+        "service": "Service Name"
+    }
+    """
+    payload = request.get_json(silent=True) or {}
+    rm_name = (payload.get("rmName") or "").strip()
+    rm_email = (payload.get("rmEmail") or "").strip()
+    commission_id = (payload.get("commissionId") or "Unknown").strip()
+    client_name = (payload.get("clientName") or "Unknown").strip()
+    service = (payload.get("service") or "Unknown Service").strip()
+
+    if not rm_name or not rm_email:
+        return jsonify({"error": "Both 'rmName' and 'rmEmail' are required."}), 400
+
+    try:
+        result = send_rm_unassignment_email(rm_name, rm_email, commission_id, client_name, service)
     except EmailServiceError as exc:
         return jsonify({"error": str(exc)}), 502
 

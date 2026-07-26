@@ -4,9 +4,14 @@ import { Check, Edit2, X } from "lucide-react";
 import { PageHeader, StatusBadge } from "../../components/common";
 import { accountsService, type Account } from "../../services/accountsService";
 import { type Commission } from "../../services/sheetsService";
+import { sendRMAssignmentEmail, sendRMUnassignedEmail } from "../../services/emailService";
+import { tasksService } from "../../services/tasksService";
 
 /**
  * Renders the full Commission Tracker for Admins to view and assign.
+ * Reassigning the RM on a commission emails both the previous RM (no
+ * longer assigned) and the newly assigned RM, and keeps the linked
+ * Task Assignment entry (if any) pointed at the correct RM.
  * Domain: Admin
  * @returns {JSX.Element}
  */
@@ -25,6 +30,7 @@ export function AdminTracker({
     problems: string;
     status: string;
   } | null>(null);
+  const [reassigning, setReassigning] = useState(false);
 
   const [makers, setMakers] = useState<Account[]>([]);
 
@@ -43,16 +49,78 @@ export function AdminTracker({
     });
   };
 
+  const findMakerByName = (name: string | null): Account | undefined => {
+    if (!name) return undefined;
+    return makers.find(m => `${m.firstName} ${m.lastName}` === name);
+  };
+
   const handleSaveAssignment = async (id: string) => {
-    if (editForm) {
-      await onUpdate(id, {
-        rm: editForm.rm || null,
-        printer: editForm.printer || null,
-        deadline: editForm.deadline || null,
-        problems: editForm.problems || null,
-        status: editForm.status
-      });
+    if (!editForm) return;
+    const original = commissions.find(c => c.id === id);
+    const previousRM = original?.rm || null;
+    const newRM = editForm.rm || null;
+
+    setReassigning(true);
+
+    await onUpdate(id, {
+      rm: newRM,
+      printer: editForm.printer || null,
+      deadline: editForm.deadline || null,
+      problems: editForm.problems || null,
+      status: editForm.status
+    });
+
+    // If the assigned RM actually changed, notify both sides by email and
+    // keep the linked Task Assignment entry (if one exists for this
+    // commission) pointed at the correct RM.
+    if (original && previousRM !== newRM) {
+      const prevMaker = findMakerByName(previousRM);
+      const newMaker = findMakerByName(newRM);
+
+      if (prevMaker) {
+        await sendRMUnassignedEmail(
+          `${prevMaker.firstName} ${prevMaker.lastName}`,
+          prevMaker.email,
+          id,
+          original.client,
+          original.service
+        );
+      }
+      if (newMaker) {
+        await sendRMAssignmentEmail(
+          `${newMaker.firstName} ${newMaker.lastName}`,
+          newMaker.email,
+          id,
+          original.client,
+          original.service
+        );
+      }
+
+      try {
+        const tasks = await tasksService.fetchTasks();
+        const linkedTask = tasks.find(t => t.task.includes(`[${id}]`));
+
+        if (newMaker) {
+          if (linkedTask) {
+            await tasksService.updateTask(linkedTask.id, { rm_id: newMaker.id });
+          } else {
+            await tasksService.addTask({
+              rm_id: newMaker.id,
+              task: `${original.service} — ${original.client} [${id}]`,
+              deadline: editForm.deadline || original.deadline || "",
+              source: "Manual",
+            });
+          }
+        } else if (linkedTask) {
+          // Commission was unassigned entirely — drop the stale task link.
+          await tasksService.deleteTask(linkedTask.id);
+        }
+      } catch (err) {
+        console.error("[AdminTracker] Failed to sync linked task on reassignment.", err);
+      }
     }
+
+    setReassigning(false);
     setEditId(null);
     setEditForm(null);
   };
@@ -188,10 +256,10 @@ export function AdminTracker({
                     <div className="flex gap-1.5">
                       {isEditing ? (  
                         <>
-                          <button onClick={() => handleSaveAssignment(c.id)} className="p-1.5 bg-emerald-500/20 text-emerald-500 rounded hover:bg-emerald-500/30 transition" title="Save">
+                          <button onClick={() => handleSaveAssignment(c.id)} disabled={reassigning} className="p-1.5 bg-emerald-500/20 text-emerald-500 rounded hover:bg-emerald-500/30 transition disabled:opacity-40" title="Save">
                             <Check className="w-3.5 h-3.5" />
                           </button>
-                          <button onClick={cancelEdit} className="p-1.5 bg-red-500/20 text-red-500 rounded hover:bg-red-500/30 transition" title="Cancel">
+                          <button onClick={cancelEdit} disabled={reassigning} className="p-1.5 bg-red-500/20 text-red-500 rounded hover:bg-red-500/30 transition disabled:opacity-40" title="Cancel">
                             <X className="w-3.5 h-3.5" />
                           </button>
                         </>
