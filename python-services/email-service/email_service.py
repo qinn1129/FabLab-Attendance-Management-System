@@ -14,7 +14,7 @@ GOOGLE_SCRIPT_URL = os.getenv("GOOGLE_SCRIPT_URL", "https://script.google.com/ma
 WEBAPP_SECRET = os.getenv("WEBAPP_SECRET", "7893402haefudHJFKio&%^*(#G2ghd0")
 
 SENDER_EMAIL = "roughmage33@gmail.com"
-SENDER_APP_PASSWORD = os.getenv("SENDER_APP_PASSWORD", "lbkc vyso bifa qmvk") 
+SENDER_APP_PASSWORD = os.getenv("SENDER_APP_PASSWORD", "lbkc vyso bifa qmvk")
 
 SMTP_HOST = "smtp.gmail.com"
 SMTP_PORT = 465  # SSL
@@ -28,9 +28,6 @@ def fetch_resident_maker_emails() -> List[str]:
     """
     Fetches the "accounts" sheet from the Apps Script backend and returns
     the email addresses of every Resident Maker whose status is "Active".
-
-    Mirrors accountsService.fetchResidentMakers() on the frontend, just
-    implemented here in Python since this runs as a separate service.
     """
     if not GOOGLE_SCRIPT_URL:
         raise EmailServiceError(
@@ -67,8 +64,6 @@ def fetch_admin_emails() -> List[str]:
     """
     Fetches the "accounts" sheet from the Apps Script backend and returns
     the email addresses of every Admin whose status is "Active".
-
-    Used for sending admin notification emails when new commissions are submitted.
     """
     if not GOOGLE_SCRIPT_URL:
         raise EmailServiceError(
@@ -162,17 +157,14 @@ def send_announcement_email(
 ) -> Dict:
     """
     Sends a "new announcement" notification to every active Resident Maker.
-
     Recipients are placed in BCC so RMs never see each other's addresses.
-
-    Returns: {"sent": int, "recipients": [...], "failed": [...], "note"?: str}
     """
     if not title.strip() or not body.strip():
         raise EmailServiceError("Both a title and a body are required.")
     if not SENDER_APP_PASSWORD:
         raise EmailServiceError(
             "SENDER_APP_PASSWORD is not set. Generate a Gmail App Password at "
-            "https://myaccount.google.com/apppasswords for roughmage33@gmail.com "
+            "https://myaccount.google.com/apppasswords for carljustinesa@gmail.com "
             "and put it in .env."
         )
 
@@ -189,7 +181,7 @@ def send_announcement_email(
         }
 
     message = _build_message(title, body, pinned)
-    message["To"] = SENDER_EMAIL  # visible "To" is just the sender; real list is BCC
+    message["To"] = SENDER_EMAIL
     message["Bcc"] = ", ".join(recipients)
 
     context = ssl.create_default_context()
@@ -213,7 +205,7 @@ def _build_commission_confirmation_message(
     urgency: str,
     submitted: str,
 ) -> MIMEMultipart:
-    """Build a confirmation email for a commission request."""
+    """Build a confirmation email for an approved commission request."""
     subject = f"[FabLab] Your commission request {commission_id} is confirmed"
 
     text_body = f"""\
@@ -303,19 +295,14 @@ def send_commission_confirmation_email(
     client_email: str,
     commission: Dict,
 ) -> Dict:
-    """
-    Sends a confirmation email to a client when their commission request is approved.
-
-    Returns: {"sent": bool, "recipients": [...], "failed": [...], "note"?: str}
-    """
+    """Sends a confirmation email to a client when their commission request is approved."""
     if not SENDER_APP_PASSWORD:
         raise EmailServiceError(
             "SENDER_APP_PASSWORD is not set. Generate a Gmail App Password at "
-            "https://myaccount.google.com/apppasswords for roughmage33@gmail.com "
+            "https://myaccount.google.com/apppasswords for carljustinesa@gmail.com "
             "and put it in .env."
         )
 
-    # Extract commission details with fallbacks for optional fields
     commission_id = commission.get("id", "Unknown")
     service = commission.get("service", "Unknown Service")
     color = commission.get("color", "Unknown")
@@ -324,12 +311,7 @@ def send_commission_confirmation_email(
     submitted = commission.get("submitted", "Unknown")
 
     if not client_email:
-        return {
-            "sent": False,
-            "recipients": [],
-            "failed": [],
-            "note": "No client email provided.",
-        }
+        return {"sent": False, "recipients": [], "failed": [], "note": "No client email provided."}
 
     message = _build_commission_confirmation_message(
         client_name=client_name,
@@ -351,6 +333,243 @@ def send_commission_confirmation_email(
         raise EmailServiceError(f"Failed to send confirmation email: {exc}") from exc
 
     return {"sent": True, "recipients": [client_email], "failed": []}
+
+
+def _build_commission_rejection_message(
+    client_name: str,
+    client_email: str,
+    commission_id: str,
+    service: str,
+    reason: str,
+) -> MIMEMultipart:
+    """Build a rejection notice email for an invalid/declined commission request."""
+    subject = f"[FabLab] Update on your commission request {commission_id}"
+
+    reason_text = f"\nReason provided: {reason}\n" if reason else ""
+    text_body = f"""\
+Dear {client_name},
+
+Thank you for your interest in Animo Labs FabLab. After review, we're unable to move forward with your commission request at this time.
+
+Request Details:
+- Commission ID: {commission_id}
+- Service: {service}
+{reason_text}
+If you believe this was a mistake or would like more information, please reach out to us directly, or feel free to submit a new request with updated details.
+
+— Animo Labs FabLab
+This is an automated notification. Please do not reply to this email.
+"""
+
+    reason_html = (
+        f'<p style="color:#333;font-size:13px;margin:4px 0;"><span style="color:#6b6b80;">Reason:</span> {reason}</p>'
+        if reason
+        else ""
+    )
+    html_body = f"""\
+<html>
+  <body style="font-family: 'Inter', Arial, sans-serif; background:#f8f9fb; padding:24px;">
+    <div style="max-width:560px;margin:0 auto;background:#ffffff;border-radius:16px;
+                border:1px solid #eceef2;overflow:hidden;">
+      <div style="background:#7f1d1d;padding:20px 28px;">
+        <p style="color:#fee2e2;font-size:13px;letter-spacing:.05em;text-transform:uppercase;
+                  margin:0;font-family:monospace;">Animo Labs FabLab</p>
+        <p style="color:#ffffff;font-size:18px;font-weight:700;margin:4px 0 0;">
+          Commission Request Update
+        </p>
+      </div>
+      <div style="padding:28px;">
+        <p style="color:#333;font-size:14px;line-height:1.6;">
+          Dear {client_name},
+        </p>
+
+        <p style="color:#333;font-size:14px;line-height:1.6;">
+          Thank you for your interest in Animo Labs FabLab. After review, we're unable to move forward with your commission request at this time.
+        </p>
+
+        <div style="background:#f1f0f6;border-radius:8px;padding:20px;margin:20px 0;">
+          <p style="color:#0f0f14;font-size:14px;margin:0 0 8px;"><strong>Request Details:</strong></p>
+          <p style="color:#333;font-size:13px;margin:4px 0;"><span style="color:#6b6b80;">Commission ID:</span> <span style="font-family:monospace;color:#dc2626;">{commission_id}</span></p>
+          <p style="color:#333;font-size:13px;margin:4px 0;"><span style="color:#6b6b80;">Service:</span> {service}</p>
+          {reason_html}
+        </div>
+
+        <p style="color:#333;font-size:14px;line-height:1.6;">
+          If you believe this was a mistake or would like more information, please reach out to us directly, or feel free to submit a new request with updated details.
+        </p>
+
+        <p style="color:#333;font-size:14px;line-height:1.6;margin-top:20px;">
+          Thank you for your understanding.
+        </p>
+      </div>
+      <div style="padding:16px 28px;background:#f1f0f6;color:#6b6b80;font-size:12px;">
+        This is an automated notification from the Resident Maker Management System.
+        Please do not reply to this email.
+      </div>
+    </div>
+  </body>
+</html>
+"""
+
+    message = MIMEMultipart("alternative")
+    message["Subject"] = subject
+    message["From"] = f"Animo Labs FabLab <{SENDER_EMAIL}>"
+    message["To"] = client_email
+    message.attach(MIMEText(text_body, "plain"))
+    message.attach(MIMEText(html_body, "html"))
+    return message
+
+
+def send_commission_rejection_email(
+    client_name: str,
+    client_email: str,
+    commission: Dict,
+    reason: str = "",
+) -> Dict:
+    """Sends a rejection notice to a client when their commission request is declined."""
+    if not SENDER_APP_PASSWORD:
+        raise EmailServiceError(
+            "SENDER_APP_PASSWORD is not set. Generate a Gmail App Password at "
+            "https://myaccount.google.com/apppasswords for carljustinesa@gmail.com "
+            "and put it in .env."
+        )
+
+    commission_id = commission.get("id", "Unknown")
+    service = commission.get("service", "Unknown Service")
+
+    if not client_email:
+        return {"sent": False, "recipients": [], "failed": [], "note": "No client email provided."}
+
+    message = _build_commission_rejection_message(
+        client_name=client_name,
+        client_email=client_email,
+        commission_id=commission_id,
+        service=service,
+        reason=reason,
+    )
+
+    context = ssl.create_default_context()
+    try:
+        with smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT, context=context) as server:
+            server.login(SENDER_EMAIL, SENDER_APP_PASSWORD)
+            server.sendmail(SENDER_EMAIL, [client_email], message.as_string())
+    except smtplib.SMTPException as exc:
+        raise EmailServiceError(f"Failed to send rejection email: {exc}") from exc
+
+    return {"sent": True, "recipients": [client_email], "failed": []}
+
+
+def _build_rm_assignment_message(
+    rm_name: str,
+    rm_email: str,
+    commission_id: str,
+    client_name: str,
+    service: str,
+) -> MIMEMultipart:
+    """Build a "you've been assigned a new commission" email for a Resident Maker."""
+    subject = f"[FabLab] New commission assigned to you: {commission_id}"
+
+    text_body = f"""\
+Hi {rm_name},
+
+A new commission has been auto-assigned to you based on current workload.
+
+Assignment Details:
+- Commission ID: {commission_id}
+- Client: {client_name}
+- Service: {service}
+
+Please log in to the RM Portal to review the full details and begin work.
+
+— Animo Labs FabLab
+This is an automated notification. Please do not reply to this email.
+"""
+
+    html_body = f"""\
+<html>
+  <body style="font-family: 'Inter', Arial, sans-serif; background:#f8f9fb; padding:24px;">
+    <div style="max-width:560px;margin:0 auto;background:#ffffff;border-radius:16px;
+                border:1px solid #eceef2;overflow:hidden;">
+      <div style="background:#064e3b;padding:20px 28px;">
+        <p style="color:#ecfdf5;font-size:13px;letter-spacing:.05em;text-transform:uppercase;
+                  margin:0;font-family:monospace;">Animo Labs FabLab</p>
+        <p style="color:#ffffff;font-size:18px;font-weight:700;margin:4px 0 0;">
+          New Commission Assigned
+        </p>
+      </div>
+      <div style="padding:28px;">
+        <p style="color:#333;font-size:14px;line-height:1.6;">
+          Hi {rm_name},
+        </p>
+
+        <p style="color:#333;font-size:14px;line-height:1.6;">
+          A new commission has been <strong>auto-assigned</strong> to you based on current workload.
+        </p>
+
+        <div style="background:#f1f0f6;border-radius:8px;padding:20px;margin:20px 0;">
+          <p style="color:#0f0f14;font-size:14px;margin:0 0 8px;"><strong>Assignment Details:</strong></p>
+          <p style="color:#333;font-size:13px;margin:4px 0;"><span style="color:#6b6b80;">Commission ID:</span> <span style="font-family:monospace;color:#059669;">{commission_id}</span></p>
+          <p style="color:#333;font-size:13px;margin:4px 0;"><span style="color:#6b6b80;">Client:</span> {client_name}</p>
+          <p style="color:#333;font-size:13px;margin:4px 0;"><span style="color:#6b6b80;">Service:</span> {service}</p>
+        </div>
+
+        <p style="color:#333;font-size:14px;line-height:1.6;">
+          Please log in to the RM Portal to review the full details and begin work.
+        </p>
+      </div>
+      <div style="padding:16px 28px;background:#f1f0f6;color:#6b6b80;font-size:12px;">
+        This is an automated notification from the Resident Maker Management System.
+        Please do not reply to this email.
+      </div>
+    </div>
+  </body>
+</html>
+"""
+
+    message = MIMEMultipart("alternative")
+    message["Subject"] = subject
+    message["From"] = f"Animo Labs FabLab <{SENDER_EMAIL}>"
+    message["To"] = rm_email
+    message.attach(MIMEText(text_body, "plain"))
+    message.attach(MIMEText(html_body, "html"))
+    return message
+
+
+def send_rm_assignment_email(
+    rm_name: str,
+    rm_email: str,
+    commission_id: str,
+    client_name: str,
+    service: str,
+) -> Dict:
+    """Sends a "new commission assigned to you" email to the Resident Maker chosen by auto-assignment."""
+    if not SENDER_APP_PASSWORD:
+        raise EmailServiceError(
+            "SENDER_APP_PASSWORD is not set. Generate a Gmail App Password at "
+            "https://myaccount.google.com/apppasswords for carljustinesa@gmail.com "
+            "and put it in .env."
+        )
+
+    if not rm_email:
+        return {"sent": False, "recipients": [], "failed": [], "note": "No RM email provided."}
+
+    message = _build_rm_assignment_message(
+        rm_name=rm_name,
+        rm_email=rm_email,
+        commission_id=commission_id,
+        client_name=client_name,
+        service=service,
+    )
+
+    context = ssl.create_default_context()
+    try:
+        with smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT, context=context) as server:
+            server.login(SENDER_EMAIL, SENDER_APP_PASSWORD)
+            server.sendmail(SENDER_EMAIL, [rm_email], message.as_string())
+    except smtplib.SMTPException as exc:
+        raise EmailServiceError(f"Failed to send RM assignment email: {exc}") from exc
+
+    return {"sent": True, "recipients": [rm_email], "failed": []}
 
 
 def _build_admin_notification_message(
@@ -425,7 +644,7 @@ This is an automated notification. Please do not reply to this email.
     message = MIMEMultipart("alternative")
     message["Subject"] = subject
     message["From"] = f"Animo Labs FabLab <{SENDER_EMAIL}>"
-    message["To"] = SENDER_EMAIL  # visible "To" is just the sender
+    message["To"] = SENDER_EMAIL
     message.attach(MIMEText(text_body, "plain"))
     message.attach(MIMEText(html_body, "html"))
     return message
@@ -439,27 +658,18 @@ def send_admin_notification_email(
     service: str,
     submitted: str,
 ) -> Dict:
-    """
-    Sends a notification email to all active Admins when a new commission is submitted.
-
-    Returns: {"sent": int, "recipients": [...], "failed": [...], "note"?: str}
-    """
+    """Sends a notification email to all active Admins when a new commission is submitted."""
     if not SENDER_APP_PASSWORD:
         raise EmailServiceError(
             "SENDER_APP_PASSWORD is not set. Generate a Gmail App Password at "
-            "https://myaccount.google.com/apppasswords for roughmage33@gmail.com "
+            "https://myaccount.google.com/apppasswords for carljustinesa@gmail.com "
             "and put it in .env."
         )
 
     recipients = fetch_admin_emails()
 
     if not recipients:
-        return {
-            "sent": 0,
-            "recipients": [],
-            "failed": [],
-            "note": "No active Admins to notify.",
-        }
+        return {"sent": 0, "recipients": [], "failed": [], "note": "No active Admins to notify."}
 
     message = _build_admin_notification_message(
         client_name=client_name,
@@ -577,25 +787,16 @@ def send_client_queue_notification_email(
     service: str,
     submitted: str,
 ) -> Dict:
-    """
-    Sends a notification email to a client when their commission is submitted to the admin queue.
-
-    Returns: {"sent": bool, "recipients": [...], "failed": [...], "note"?: str}
-    """
+    """Sends a notification email to a client when their commission is submitted to the admin queue."""
     if not SENDER_APP_PASSWORD:
         raise EmailServiceError(
             "SENDER_APP_PASSWORD is not set. Generate a Gmail App Password at "
-            "https://myaccount.google.com/apppasswords for roughmage33@gmail.com "
+            "https://myaccount.google.com/apppasswords for carljustinesa@gmail.com "
             "and put it in .env."
         )
 
     if not client_email:
-        return {
-            "sent": False,
-            "recipients": [],
-            "failed": [],
-            "note": "No client email provided.",
-        }
+        return {"sent": False, "recipients": [], "failed": [], "note": "No client email provided."}
 
     message = _build_client_queue_notification_message(
         client_name=client_name,

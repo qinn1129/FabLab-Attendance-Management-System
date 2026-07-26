@@ -5,8 +5,10 @@ from email_service import (
     EmailServiceError,
     send_announcement_email,
     send_commission_confirmation_email,
+    send_commission_rejection_email,
     send_admin_notification_email,
     send_client_queue_notification_email,
+    send_rm_assignment_email,
 )
 
 app = Flask(__name__)
@@ -54,6 +56,68 @@ def send_commission_confirmation():
 
     try:
         result = send_commission_confirmation_email(client_name, client_email, commission)
+    except EmailServiceError as exc:
+        return jsonify({"error": str(exc)}), 502
+
+    return jsonify(result), 200
+
+
+@app.post("/api/send-commission-rejection")
+def send_commission_rejection():
+    """
+    Send a rejection notice to a client when their commission request is declined.
+    Expected payload: {
+        "clientName": "Client Name",
+        "clientEmail": "client@example.com",
+        "commission": { ... full commission object ... },
+        "reason": "Optional reason text"
+    }
+    """
+    payload = request.get_json(silent=True) or {}
+    client_name = (payload.get("clientName") or "").strip()
+    client_email = (payload.get("clientEmail") or "").strip()
+    commission = payload.get("commission", {})
+    reason = (payload.get("reason") or "").strip()
+
+    if not client_name or not client_email:
+        return jsonify({"error": "Both 'clientName' and 'clientEmail' are required."}), 400
+
+    if not commission:
+        return jsonify({"error": "Commission data is required."}), 400
+
+    try:
+        result = send_commission_rejection_email(client_name, client_email, commission, reason)
+    except EmailServiceError as exc:
+        return jsonify({"error": str(exc)}), 502
+
+    return jsonify(result), 200
+
+
+@app.post("/api/send-rm-assignment")
+def send_rm_assignment():
+    """
+    Send a "new commission assigned to you" email to the Resident Maker
+    chosen by auto-assignment.
+    Expected payload: {
+        "rmName": "RM Name",
+        "rmEmail": "rm@example.com",
+        "commissionId": "COM-XXX",
+        "clientName": "Client Name",
+        "service": "Service Name"
+    }
+    """
+    payload = request.get_json(silent=True) or {}
+    rm_name = (payload.get("rmName") or "").strip()
+    rm_email = (payload.get("rmEmail") or "").strip()
+    commission_id = (payload.get("commissionId") or "Unknown").strip()
+    client_name = (payload.get("clientName") or "Unknown").strip()
+    service = (payload.get("service") or "Unknown Service").strip()
+
+    if not rm_name or not rm_email:
+        return jsonify({"error": "Both 'rmName' and 'rmEmail' are required."}), 400
+
+    try:
+        result = send_rm_assignment_email(rm_name, rm_email, commission_id, client_name, service)
     except EmailServiceError as exc:
         return jsonify({"error": str(exc)}), 502
 

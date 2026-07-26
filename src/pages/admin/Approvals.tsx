@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { Check, X, User, CheckCircle, Sparkles } from "lucide-react";
 import { PageHeader } from "../../components/common";
 import { type Commission } from "../../services/sheetsService";
-import { sendCommissionConfirmationEmail } from "../../services/emailService";
+import { sendCommissionConfirmationEmail, sendCommissionRejectionEmail, sendRMAssignmentEmail } from "../../services/emailService";
 import { accountsService } from "../../services/accountsService";
 
 /**
@@ -27,6 +27,7 @@ export function AdminApprovals({
     const activeMakers = makers.filter(m => m.status === "Active");
 
     let assignedRM: string | null = null;
+    let assignedRMEmail: string | null = null;
 
     if (activeMakers.length > 0) {
       // 2. Count active commissions (Pending or In Progress) for each active RM
@@ -35,12 +36,13 @@ export function AdminApprovals({
         const activeJobsCount = commissions.filter(c =>
           c.rm === rmName && (c.status === "Pending" || c.status === "In Progress")
         ).length;
-        return { name: rmName, count: activeJobsCount };
+        return { name: rmName, email: rm.email, count: activeJobsCount };
       });
 
       // 3. Select the RM with the lowest number of active commissions
       rmCounts.sort((a, b) => a.count - b.count);
       assignedRM = rmCounts[0].name;
+      assignedRMEmail = rmCounts[0].email;
     }
 
     // 4. Update status to Pending and set auto-assigned RM
@@ -59,11 +61,34 @@ export function AdminApprovals({
         commission.clientEmail,
         { ...commission, status: "Pending", rm: assignedRM }
       );
+
+      // Notify the auto-assigned RM directly
+      if (assignedRM && assignedRMEmail) {
+        await sendRMAssignmentEmail(
+          assignedRM,
+          assignedRMEmail,
+          id,
+          commission.client,
+          commission.service
+        );
+      }
     }
   };
 
   const handleReject = async (id: string) => {
+    const commission = commissions.find(c => c.id === id);
+    const reason = window.prompt("Reason for rejection (optional — shown to the client):") || "";
+
     await onUpdate(id, { status: "Rejected" });
+
+    if (commission) {
+      await sendCommissionRejectionEmail(
+        commission.client,
+        commission.clientEmail,
+        commission,
+        reason
+      );
+    }
   };
 
   return (
@@ -93,26 +118,49 @@ export function AdminApprovals({
                 <User className="w-5 h-5 text-orange-500" />
               </div>
 
-              <div className="flex-1 min-w-0 grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-1">
-                
+              <div className="flex-1 min-w-0 grid grid-cols-2 md:grid-cols-6 gap-x-6 gap-y-2">
+
                 {/*Client*/}
                 <div>
                   <p className="text-xs text-muted-foreground">Client</p>
                   <p className="text-sm font-semibold text-foreground">{item.client}</p>
                 </div>
-                
+
                 {/*Service*/}
                 <div>
                   <p className="text-xs text-muted-foreground">Service</p>
                   <p className="text-sm text-card-foreground">{item.service}</p>
                 </div>
-                
+
                 {/*Contact*/}
                 <div>
                   <p className="text-xs text-muted-foreground">Contact</p>
                   <p className="text-sm text-card-foreground truncate">{item.clientEmail}</p>
                 </div>
-                
+
+                {/*Drive Link*/}
+                <div>
+                  <p className="text-xs text-muted-foreground">Drive Link</p>
+                  {item.driveLink ? (
+                    <a
+                      href={item.driveLink}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-sm text-blue-500 hover:text-blue-600 underline font-medium"
+                    >
+                      Link
+                    </a>
+                  ) : (
+                    <p className="text-sm text-muted-foreground/50 italic">—</p>
+                  )}
+                </div>
+
+                {/*Expected Pickup Date*/}
+                <div>
+                  <p className="text-xs text-muted-foreground">Pickup Date</p>
+                  <p className="text-sm font-mono text-card-foreground">{item.expectedPickupDate || "—"}</p>
+                </div>
+
                 {/*Submitted*/}
                 <div>
                   <p className="text-xs text-muted-foreground">Submitted</p>
@@ -125,7 +173,7 @@ export function AdminApprovals({
                 <button onClick={() => handleApprove(item.id)} className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg transition flex items-center gap-1">
                   <Check className="w-3.5 h-3.5" /> Approve
                 </button>
-                
+
                 <button onClick={() => handleReject(item.id)} className="px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-500 text-xs font-semibold rounded-lg border border-red-500/20 transition flex items-center gap-1">
                   <X className="w-3.5 h-3.5" /> Reject
                 </button>
