@@ -21,7 +21,7 @@ interface MentionSuggestion {
 }
 
 const POLL_INTERVAL_MS = 4000;
-const MAX_MENTION_RESULTS = 6;
+const MAX_MENTION_RESULTS = 100;
 const EVERYONE_TOKEN = "everyone";
 
 // Custom notification sound files. Drop your own .mp4 files at these paths
