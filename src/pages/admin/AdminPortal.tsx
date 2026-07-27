@@ -103,15 +103,15 @@ export function AdminPortal({
   if (!loggedIn) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[linear-gradient(135deg,_#052e16_0%,_#064e3b_60%,_#0f172a_100%)]">
-        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-8">
+        <div className="bg-gray-950 rounded-2xl shadow-2xl w-full max-w-sm p-8 border border-gray-800">
           <div className="text-center mb-7">
             <div className="w-12 h-12 rounded-xl bg-emerald-600 flex items-center justify-center mx-auto mb-3">
               <Settings className="w-6 h-6 text-white" />
             </div>
-            <h2 className="text-xl font-bold text-gray-900">Admin Portal</h2>
+            <h2 className="text-xl font-bold text-white">Admin Portal</h2>
             <p className="text-gray-400 text-sm mt-1">Animo Labs FabLab Management System</p>
           </div>
-          <div className="space-y-3 mb-5">
+          <div className="space-y-3 mb-5 [&_label]:text-white">
             <Input label="Email Address" type="email" value={email} onChange={setEmail} placeholder="admin@animolabs.ph" />
             <Input label="Password" type="password" value={pass} onChange={setPass} placeholder="••••••••" />
           </div>
@@ -120,15 +120,15 @@ export function AdminPortal({
               type="checkbox"
               checked={remember}
               onChange={e => setRemember(e.target.checked)}
-              className="w-4 h-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-400"
+              className="w-4 h-4 rounded border-gray-600 text-emerald-600 focus:ring-emerald-400"
             />
-            <span className="text-sm text-gray-600">Remember me</span>
+            <span className="text-sm text-gray-300">Remember me</span>
           </label>
           {loginError && <p className="text-red-500 text-sm mb-3">{loginError}</p>}
           <button onClick={handleLogin} disabled={!email || !pass || isLoggingIn} className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white font-semibold py-2.5 rounded-xl transition">
             {isLoggingIn ? "Signing In..." : "Sign In"}
           </button>
-          <button onClick={onBack} className="w-full mt-3 text-gray-400 hover:text-gray-600 text-sm transition text-center">
+          <button onClick={onBack} className="w-full mt-3 text-gray-400 hover:text-gray-300 text-sm transition text-center">
             ← Back to Home
           </button>
         </div>

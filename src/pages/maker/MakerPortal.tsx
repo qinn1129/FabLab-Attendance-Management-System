@@ -137,28 +137,28 @@ export function MakerPortal({
     if (authView === "register") {
       return (
         <div className="min-h-screen flex items-center justify-center bg-[linear-gradient(135deg,_#064e3b_0%,_#065f46_60%,_#0f172a_100%)] p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-8">
-            <button onClick={() => { setAuthView("login"); setRegError(""); setRegSuccess(""); }} className="flex items-center gap-1 text-gray-400 hover:text-gray-600 text-sm mb-4 transition">
+          <div className="bg-gray-950 rounded-2xl shadow-2xl w-full max-w-sm p-8 border border-gray-800">
+            <button onClick={() => { setAuthView("login"); setRegError(""); setRegSuccess(""); }} className="flex items-center gap-1 text-gray-400 hover:text-gray-300 text-sm mb-4 transition">
               <ArrowLeft className="w-4 h-4" /> Back to Sign In
             </button>
             <div className="text-center mb-6">
               <div className="w-12 h-12 rounded-xl bg-emerald-500 flex items-center justify-center mx-auto mb-3">
                 <Users className="w-6 h-6 text-white" />
               </div>
-              <h2 className="text-xl font-bold text-gray-900">Register as Resident Maker</h2>
+              <h2 className="text-xl font-bold text-white">Register as Resident Maker</h2>
               <p className="text-gray-400 text-sm mt-1">Your account needs Admin approval before you can log in.</p>
             </div>
 
             {regSuccess ? (
-              <div className="p-4 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-xl text-sm text-center">
+              <div className="p-4 bg-emerald-950 text-emerald-400 border border-emerald-800 rounded-xl text-sm text-center">
                 {regSuccess}
-                <button onClick={() => setAuthView("login")} className="block w-full mt-3 text-emerald-700 font-semibold underline">
+                <button onClick={() => setAuthView("login")} className="block w-full mt-3 text-emerald-400 font-semibold underline">
                   Return to Sign In
                 </button>
               </div>
             ) : (
               <>
-                <div className="space-y-3 mb-5 text-gray-900 [&_label]:text-gray-900">
+                <div className="space-y-3 mb-5 text-white [&_label]:text-white">
                   <div className="grid grid-cols-2 gap-3">
                     <Input label="First Name" value={regForm.firstName} onChange={v => setRegForm(f => ({ ...f, firstName: v }))} placeholder="Juan" required />
                     <Input label="Last Name" value={regForm.lastName} onChange={v => setRegForm(f => ({ ...f, lastName: v }))} placeholder="dela Cruz" required />
@@ -188,15 +188,15 @@ export function MakerPortal({
 
     return (
       <div className="min-h-screen flex items-center justify-center bg-[linear-gradient(135deg,_#064e3b_0%,_#065f46_60%,_#0f172a_100%)]">
-        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-8">
+        <div className="bg-gray-950 rounded-2xl shadow-2xl w-full max-w-sm p-8 border border-gray-800">
           <div className="text-center mb-7">
             <div className="w-12 h-12 rounded-xl bg-emerald-500 flex items-center justify-center mx-auto mb-3">
               <Users className="w-6 h-6 text-white" />
             </div>
-            <h2 className="text-xl font-bold text-gray-900">Resident Maker Portal</h2>
+            <h2 className="text-xl font-bold text-white">Resident Maker Portal</h2>
             <p className="text-gray-400 text-sm mt-1">Animo Labs FabLab — RM Dashboard</p>
           </div>
-          <div className="space-y-3 mb-5 text-gray-900 [&_label]:text-gray-900">
+          <div className="space-y-3 mb-5 text-white [&_label]:text-white">
             <Input label="Email Address" type="email" value={email} onChange={setEmail} placeholder="name@dlsu.edu.ph" />
             <Input label="Password" type="password" value={pass} onChange={setPass} placeholder="••••••••" />
           </div>
@@ -205,18 +205,18 @@ export function MakerPortal({
               type="checkbox"
               checked={remember}
               onChange={e => setRemember(e.target.checked)}
-              className="w-4 h-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-400"
+              className="w-4 h-4 rounded border-gray-600 text-emerald-600 focus:ring-emerald-400"
               />
-              <span className="text-sm text-gray-600">Remember me</span>
+              <span className="text-sm text-gray-300">Remember me</span>
               </label>
           {loginError && <p className="text-red-500 text-sm mb-3">{loginError}</p>}
           <button onClick={handleLogin} disabled={!email || !pass || isLoggingIn} className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white font-semibold py-2.5 rounded-xl transition">
             {isLoggingIn ? "Signing In..." : "Sign In"}
           </button>
-          <button onClick={() => { setAuthView("register"); setLoginError(""); }} className="w-full mt-3 text-emerald-600 hover:text-emerald-700 text-sm font-medium transition text-center">
+          <button onClick={() => { setAuthView("register"); setLoginError(""); }} className="w-full mt-3 text-emerald-400 hover:text-emerald-300 text-sm font-medium transition text-center">
             New here? Register as a Resident Maker
           </button>
-          <button onClick={onBack} className="w-full mt-2 text-gray-400 hover:text-gray-600 text-sm transition text-center">
+          <button onClick={onBack} className="w-full mt-2 text-gray-400 hover:text-gray-300 text-sm transition text-center">
             ← Back to Home
           </button>
         </div>
