@@ -66,7 +66,7 @@ export function AdminProfile({
 
   return (
     <div className="p-6">
-      <PageHeader title="Admin Profile" sub="Your account information and bio" />
+      <PageHeader title="Profile" sub="Your account information and bio" />
       <div className="bg-card rounded-xl border border-border p-6 max-w-lg">
         <div className="flex items-center gap-4 mb-6">
            <div className="relative w-16 h-16 flex-shrink-0">

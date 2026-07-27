@@ -95,7 +95,7 @@ export function AdminAnnouncements() {
 
   return (
     <div className="p-6">
-      <PageHeader title="Announcements & Chat" sub="Manage public announcements and team communication"
+      <PageHeader title="Announcements" sub="Manage public announcements and team communication"
         action={<button onClick={() => setAdding(o => !o)} className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium px-3 py-2 rounded-lg transition"><Plus className="w-4 h-4" />New</button>}
       />
 
