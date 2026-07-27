@@ -6,3 +6,4 @@ export * from "./PageHeader";
 export * from "./StatCard";
 export * from "./ChatWidget";
 export * from "./ChangePasswordForm";
+export * from "./FridayScheduleNotification";

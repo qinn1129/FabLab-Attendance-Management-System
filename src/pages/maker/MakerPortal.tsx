@@ -29,6 +29,17 @@ export function MakerPortal({
   const [screen, setScreen] = useState("dashboard");
   const [account, setAccount] = useState<Account | null>(null);
   const [checkingSession, setCheckingSession] = useState(true);
+  const [fridayNotificationDismissed, setFridayNotificationDismissed] = useState(false);
+
+  // Auto-dismiss Friday schedule notification when navigating to a different tab
+  useEffect(() => {
+    if (screen !== "dashboard") {
+      setFridayNotificationDismissed(true);
+    }
+  }, [screen]);
+
+  const isFriday = new Date().getDay() === 5 || window.location.search.includes("forceFriday=true");
+  const showFridayNotification = isFriday && !fridayNotificationDismissed;
 
   const [email, setEmail] = useState("");
   const [pass, setPass] = useState("");
@@ -227,13 +238,29 @@ export function MakerPortal({
   const renderScreen = () => {
     const makerName = `${account!.firstName} ${account!.lastName}`;
     switch (screen) {
-      case "dashboard": return <MakerDashboard commissions={commissions} account={account!} />;
+      case "dashboard":
+        return (
+          <MakerDashboard
+            commissions={commissions}
+            account={account!}
+            showFridayNotification={showFridayNotification}
+            onDismissFridayNotification={() => setFridayNotificationDismissed(true)}
+          />
+        );
       case "attendance": return <MakerAttendance account={account!} onAccountUpdate={setAccount} />;
       case "reservations": return <MakerReservations account={account!} />;
       case "commissions": return <MakerCommissions commissions={commissions} onUpdate={onUpdate} makerName={makerName} />;
       case "resources": return <MakerResources />;
       case "profile": return <MakerProfile account={account!} onAccountUpdate={setAccount} />;
-      default: return <MakerDashboard commissions={commissions} account={account!} />;
+      default:
+        return (
+          <MakerDashboard
+            commissions={commissions}
+            account={account!}
+            showFridayNotification={showFridayNotification}
+            onDismissFridayNotification={() => setFridayNotificationDismissed(true)}
+          />
+        );
     }
   };
 

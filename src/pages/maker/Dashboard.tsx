@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Clock, Package, Pin, ChevronLeft, ChevronRight } from "lucide-react";
-import { PageHeader, StatCard, StatusBadge } from "../../components/common";
+import { PageHeader, StatCard, StatusBadge, FridayScheduleNotification } from "../../components/common";
 import { type Commission } from "../../services/sheetsService";
 import { type Account } from "../../services/accountsService";
 import { announcementsService, type Announcement } from "../../services/announcementsService";
@@ -15,10 +15,14 @@ const ANNOUNCEMENTS_PER_PAGE = 5;
  */
 export function MakerDashboard({
   commissions,
-  account
+  account,
+  showFridayNotification,
+  onDismissFridayNotification
 }: {
   commissions: Commission[];
   account: Account;
+  showFridayNotification?: boolean;
+  onDismissFridayNotification?: () => void;
 }) {
   const makerName = `${account.firstName} ${account.lastName}`;
   const myCommissions = commissions.filter(c => c.rm === makerName);
@@ -43,7 +47,15 @@ export function MakerDashboard({
   return (
     <div className="p-6">
       
-      <PageHeader title="My Dashboard" sub={`Welcome back, ${firstName}!`} />
+      <PageHeader
+        title="My Dashboard"
+        sub={`Welcome back, ${firstName}!`}
+        action={
+          showFridayNotification && onDismissFridayNotification ? (
+            <FridayScheduleNotification onDismiss={onDismissFridayNotification} />
+          ) : undefined
+        }
+      />
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <StatCard label="My Active Jobs" value={activeCount} sub="In Progress / Pending" color="text-blue-600" />
         <StatCard label="Completed" value={completedCount} sub="Synced from Sheets" color="text-emerald-600" />
