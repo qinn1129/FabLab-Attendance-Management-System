@@ -9,19 +9,28 @@ import { cn } from "../lib/utils";
  * Navigation structure for the Admin Portal.
  */
 export const ADMIN_NAV = [
-  { id: "dashboard", label: "Dashboard", icon: BarChart2 },
-  { id: "approvals", label: "Commission Approval", icon: CheckCircle },
-  { id: "tracker", label: "Commission Tracker", icon: Package },
-  { id: "services", label: "Service Offerings", icon: Boxes },
-  { id: "machines", label: "Machine Status", icon: CpuIcon },
-  { id: "workshops", label: "Workshops", icon: Presentation },
-  { id: "tasks", label: "Task Assignment", icon: Layers },
-  { id: "testimonials", label: "Testimonials", icon: MessageSquareQuote },
-  { id: "announcements", label: "Announcements & Chat", icon: Bell },
-  { id: "modules", label: "Modules", icon: Book },
-  { id: "rm-accounts", label: "RM Accounts", icon: Users },
-  { id: "profile", label: "Admin Profile", icon: User },
-  { id: "faq", label: "FAQ Management", icon: HelpCircle },
+// Overview
+  { id: "dashboard", label: "Dashboard", icon: BarChart2, category: "Overview" },
+  
+  // Operations
+  { id: "machines", label: "Machine Status", icon: CpuIcon, category: "Operations" },
+  { id: "approvals", label: "Commission Approval", icon: CheckCircle, category: "Operations" },
+  { id: "tracker", label: "Commission Tracker", icon: Package, category: "Operations" },
+  
+  // Client Page
+  { id: "services", label: "Service Offerings", icon: Boxes, category: "Client Page" },
+  { id: "workshops", label: "Workshops", icon: Presentation, category: "Client Page" },
+  { id: "testimonials", label: "Testimonials", icon: MessageSquareQuote, category: "Client Page" },
+  
+  // Resident Makers
+  { id: "rm-accounts", label: "RM Accounts", icon: Users, category: "Resident Makers" },
+  { id: "tasks", label: "Task Assignment", icon: Layers, category: "Resident Makers" },
+  { id: "announcements", label: "Announcements & Chat", icon: Bell, category: "Resident Makers" },
+  { id: "modules", label: "Modules", icon: Book, category: "Resident Makers" },
+  { id: "faq", label: "FAQ Management", icon: HelpCircle, category: "Resident Makers" },
+  
+  // Settings
+  { id: "profile", label: "Admin Profile", icon: User, category: "Settings" },
 ];
 
 /**

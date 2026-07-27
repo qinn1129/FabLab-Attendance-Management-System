@@ -3,7 +3,6 @@ import { X, Send, MessageCircle, MessageSquare, Megaphone } from "lucide-react";
 import { chatService, type ChatMessage } from "../../services/chatService";
 import { accountsService } from "../../services/accountsService";
 import { cn } from "../../lib/utils";
-import { formatChatTimestamp } from "../../lib/dateFormat";
 
 /**
  * Props for the ChatWidget component.
@@ -37,6 +36,14 @@ function initialsFor(name: string | undefined | null): string {
   const parts = safe.split(/\s+/);
   if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
+function formatTime(iso: string): string {
+  try {
+    return new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  } catch {
+    return "";
+  }
 }
 
 /** Escapes a string for safe use inside a RegExp. */
@@ -76,7 +83,7 @@ export function ChatWidget({ accentColor = "emerald", senderName, senderRole }: 
   }, [open]);
 
   // ── @mention state ─────────────────────────────────────────────
-  const [mentionableUsers, setMentionableUsers] = useState<{ name: string; role: "Admin" | "ResidentMaker"; profilePicture?: string }[]>([]);
+  const [mentionableUsers, setMentionableUsers] = useState<{ name: string; role: "Admin" | "ResidentMaker" }[]>([]);
   const [mentionOpen, setMentionOpen] = useState(false);
   const [mentionQuery, setMentionQuery] = useState("");
   const [mentionStart, setMentionStart] = useState<number | null>(null);
@@ -233,29 +240,29 @@ export function ChatWidget({ accentColor = "emerald", senderName, senderRole }: 
     setMsgs(data);
   }, [safeSenderName, playEveryoneSound, playMentionSound]);
 
-  // Load the mentionable roster (active Admins + Resident Makers) once on mount.
-  useEffect(() => {
-   const loadRoster = () => {
-     accountsService.fetchAccounts().then(accounts => {
-       const users = accounts
-         .filter(a => a.status === "Active" && (a.role === "Admin" || a.role === "ResidentMaker"))
-         .map(a => ({
-           name: `${a.firstName} ${a.lastName}`.trim(),
-           role: a.role,
-           profilePicture: a.profilePicture || undefined,
-         }))
-         .filter(u => u.name.length > 0);
-       setMentionableUsers(users);
-     });
-   };
-   loadRoster();
-   const rosterInterval = setInterval(loadRoster, 60000); // refresh every 60s — pictures/roster changes rarely, no need to match the 4s message poll
-   return () => clearInterval(rosterInterval);
- }, []);
+  // Load the mentionable roster (active Admins + Resident Makers). Refetched
+  // on mount, periodically in the background, and every time the widget is
+  // opened — otherwise a newly-approved RM wouldn't appear in "@" suggestions
+  // until a full page reload, since this widget stays mounted for the whole
+  // session.
+  const loadMentionableUsers = useCallback(async () => {
+    const accounts = await accountsService.fetchAccounts();
+    const users = accounts
+      .filter(a => a.status === "Active" && (a.role === "Admin" || a.role === "ResidentMaker"))
+      .map(a => ({ name: `${a.firstName} ${a.lastName}`.trim(), role: a.role }))
+      .filter(u => u.name.length > 0);
+    setMentionableUsers(users);
+  }, []);
 
- function pictureFor(name: string): string | undefined {
-   return mentionableUsers.find(u => u.name === name)?.profilePicture;
- }
+  useEffect(() => {
+    loadMentionableUsers();
+    const rosterInterval = setInterval(loadMentionableUsers, 60000); // background refresh every 60s
+    return () => clearInterval(rosterInterval);
+  }, [loadMentionableUsers]);
+
+  useEffect(() => {
+    if (open) loadMentionableUsers();
+  }, [open, loadMentionableUsers]);
 
   // Poll continuously for the entire lifetime of the widget, regardless of
   // open/closed state, so mention/everyone notification sounds and the
@@ -454,24 +461,15 @@ export function ChatWidget({ accentColor = "emerald", senderName, senderRole }: 
             ) : (
               msgs.map(m => {
                 const mine = m.sender === safeSenderName;
-                const avatarUrl = pictureFor(m.sender);
                 return (
                   <div key={m.id} className={cn("flex items-end gap-2", mine && "flex-row-reverse")}>
-                    {avatarUrl ? (
-                      <img
-                        src={avatarUrl}
-                        alt={m.sender}
-                        className="w-7 h-7 rounded-full object-cover flex-shrink-0 border border-border"
-                      />
-                    ) : (
-                      <div className={cn("w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0", mine ? (accentColor === "violet" ? "bg-violet-500" : "bg-emerald-500") : "bg-gray-400")}>
-                        {initialsFor(m.sender)}
-                      </div>
-                    )}
+                    <div className={cn("w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0", mine ? (accentColor === "violet" ? "bg-violet-500" : "bg-emerald-500") : "bg-gray-400")}>
+                      {initialsFor(m.sender)}
+                    </div>
                     <div className={cn("max-w-[68%] rounded-2xl px-3 py-1.5 text-sm", mine ? bubbleMine : "bg-card border border-border text-card-foreground")}>
                       {!mine && <div className="text-[10px] font-semibold text-muted-foreground mb-0.5">{m.sender}</div>}
                       <p className="leading-snug whitespace-pre-wrap break-words">{renderMessageText(m.text, mine)}</p>
-                      <div className={cn("text-[10px] mt-0.5", mine ? "text-white/60" : "text-muted-foreground")}>{formatChatTimestamp(m.createdAt)}</div>
+                      <div className={cn("text-[10px] mt-0.5", mine ? "text-white/60" : "text-muted-foreground")}>{formatTime(m.createdAt)}</div>
                     </div>
                   </div>
                 );
@@ -498,12 +496,6 @@ export function ChatWidget({ accentColor = "emerald", senderName, senderRole }: 
                       <span className="w-6 h-6 rounded-full flex items-center justify-center bg-amber-500 text-white flex-shrink-0">
                         <Megaphone className="w-3.5 h-3.5" />
                       </span>
-                   ) : pictureFor(u.name) ? (
-                     <img
-                       src={pictureFor(u.name)}
-                       alt={u.name}
-                       className="w-6 h-6 rounded-full object-cover flex-shrink-0 border border-border"
-                     />
                     ) : (
                       <span className={cn("w-6 h-6 rounded-full flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0", u.kind === "Admin" ? "bg-emerald-600" : "bg-blue-500")}>
                         {initialsFor(u.name)}

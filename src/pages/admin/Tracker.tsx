@@ -5,7 +5,6 @@ import { PageHeader, StatusBadge } from "../../components/common";
 import { accountsService, type Account } from "../../services/accountsService";
 import { type Commission } from "../../services/sheetsService";
 import { sendRMAssignmentEmail, sendRMUnassignedEmail } from "../../services/emailService";
-import { tasksService } from "../../services/tasksService";
 
 /**
  * Renders the full Commission Tracker for Admins to view and assign.
@@ -94,29 +93,6 @@ export function AdminTracker({
           original.client,
           original.service
         );
-      }
-
-      try {
-        const tasks = await tasksService.fetchTasks();
-        const linkedTask = tasks.find(t => t.task.includes(`[${id}]`));
-
-        if (newMaker) {
-          if (linkedTask) {
-            await tasksService.updateTask(linkedTask.id, { rm_id: newMaker.id });
-          } else {
-            await tasksService.addTask({
-              rm_id: newMaker.id,
-              task: `${original.service} — ${original.client} [${id}]`,
-              deadline: editForm.deadline || original.deadline || "",
-              source: "Manual",
-            });
-          }
-        } else if (linkedTask) {
-          // Commission was unassigned entirely — drop the stale task link.
-          await tasksService.deleteTask(linkedTask.id);
-        }
-      } catch (err) {
-        console.error("[AdminTracker] Failed to sync linked task on reassignment.", err);
       }
     }
 

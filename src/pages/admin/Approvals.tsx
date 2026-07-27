@@ -4,7 +4,6 @@ import { PageHeader } from "../../components/common";
 import { type Commission } from "../../services/sheetsService";
 import { sendCommissionConfirmationEmail, sendCommissionRejectionEmail, sendRMAssignmentEmail } from "../../services/emailService";
 import { accountsService, type Account } from "../../services/accountsService";
-import { tasksService } from "../../services/tasksService";
 
 /**
  * Renders the Commission Approvals view for Admins. Approving opens a modal
@@ -97,17 +96,6 @@ export function AdminApprovals({
     // Notify the assigned RM directly
     if (assignedRM && assignedRMEmail) {
       await sendRMAssignmentEmail(assignedRM, assignedRMEmail, commission.id, commission.client, commission.service);
-    }
-
-    // Create a linked Task Assignment entry so the Admin's Task Assignment
-    // tab reflects this real commission assignment, not just free-text tasks.
-    if (assignedRM && assignedRMId) {
-      await tasksService.addTask({
-        rm_id: assignedRMId,
-        task: `${commission.service} — ${commission.client} [${commission.id}]`,
-        deadline: commission.expectedPickupDate || "",
-        source: assignMode === "auto" ? "Auto" : "Manual",
-      });
     }
 
     setConfirming(false);

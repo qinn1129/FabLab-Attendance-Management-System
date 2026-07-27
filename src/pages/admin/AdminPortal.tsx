@@ -14,10 +14,11 @@ import { AdminFAQ } from "./FAQ";
 import { accountsService, type Account } from "../../services/accountsService";
 import { rememberMe } from "../../lib/rememberMe";
 import { type Commission } from "../../services/sheetsService";
+import { AdminRMSchedules } from "./RMSchedules";
+import { AdminMachineStatus } from "./MachineStatus";
 import { AdminServices } from "./Services";
 import { AdminWorkshops } from "./Workshops";
 import { AdminTestimonials } from "./Testimonials";
-import { AdminMachineStatus } from "./MachineStatus";
 
 
 export function AdminPortal({
@@ -140,7 +141,7 @@ export function AdminPortal({
       case "dashboard": return <AdminDashboard commissions={commissions} />;
       case "approvals": return <AdminApprovals commissions={commissions} onUpdate={onUpdate} />;
       case "tracker": return <AdminTracker commissions={commissions} onUpdate={onUpdate} />;
-      case "tasks": return <AdminTasks />;
+      case "tasks": return <AdminTasks commissions={commissions} />;
       case "testimonials": return <AdminTestimonials />;
       case "announcements": return <AdminAnnouncements />;
       case "modules": return <AdminModules />;

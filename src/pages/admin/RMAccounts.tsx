@@ -120,6 +120,7 @@ export function AdminRMAccounts() {
   };
 
   const handleDeactivate = async (id: string) => {
+    if (!window.confirm("Are you sure that you want to deactivate this account?")) return;
     setActionError("");
     const result = await accountsService.updateAccount(id, { status: "Inactive" });
     if (!result.success) {

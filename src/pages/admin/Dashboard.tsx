@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { ExternalLink } from "lucide-react";
 import { ResponsiveContainer, BarChart as ReBarChart, CartesianGrid, XAxis, YAxis, Tooltip, Bar, PieChart, Pie, Cell } from "recharts";
 import { PageHeader, StatCard, StatusBadge } from "../../components/common";
 import { type Commission } from "../../services/sheetsService";
@@ -31,6 +32,11 @@ export function AdminDashboard({ commissions }: { commissions: Commission[] }) {
   const activeRMs = makers.filter(m => m.status === "Active").length;
   const onLeaveRMs = makers.filter(m => m.status === "On Leave").length;
 
+  // Real "commissions by day submitted" derived from each commission's
+  // short display date (e.g. "Jul 12"). Since only a short display string
+  // is stored (not a full timestamp), the browser infers the current year
+  // when parsing — accurate for recent submissions, which covers the
+  // intended "at a glance" use of this chart.
   const commissionsByWeekday = (() => {
     const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
     const counts: Record<string, number> = { Sun: 0, Mon: 0, Tue: 0, Wed: 0, Thu: 0, Fri: 0, Sat: 0 };
@@ -57,7 +63,31 @@ export function AdminDashboard({ commissions }: { commissions: Commission[] }) {
     <div className="p-6">
 
       {/*Dynamic Header*/}
-      <PageHeader title="Dashboard" sub={`FabLab overview · ${totalComs} Total Commissions`} />
+      <PageHeader
+        title="Dashboard"
+        sub={`FabLab overview · ${totalComs} Total Commissions`}
+        action={
+          import.meta.env.VITE_GOOGLE_SHEETS_URL ? (
+            <a
+              href={import.meta.env.VITE_GOOGLE_SHEETS_URL}
+              target="_blank"
+              rel="noreferrer"
+              className="flex items-center gap-1.5 bg-card border border-border hover:bg-muted text-foreground text-sm font-medium px-3 py-2 rounded-lg transition"
+            >
+              <ExternalLink className="w-4 h-4" />
+              Open Google Sheet
+            </a>
+          ) : (
+            <span
+              title="Set VITE_GOOGLE_SHEETS_URL in your .env to enable this button"
+              className="flex items-center gap-1.5 bg-muted text-muted-foreground text-sm font-medium px-3 py-2 rounded-lg cursor-not-allowed opacity-60"
+            >
+              <ExternalLink className="w-4 h-4" />
+              Open Google Sheet
+            </span>
+          )
+        }
+      />
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <StatCard label="Total Commissions" value={totalComs} sub="Synced from Sheets" color="text-foreground" />
