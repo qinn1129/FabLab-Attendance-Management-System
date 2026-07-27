@@ -8,7 +8,7 @@ import { ProgressBar } from "../../components/client/ProgressBar";
 import { Input, Select } from "../../components/common";
 import { sheetsService, type Commission } from "../../services/sheetsService";
 import { sendAdminNotificationEmail, sendClientQueueNotificationEmail } from "../../services/emailService";
-import animoLabLogo from "../../assets/AnimoLabLogo.png";
+import animoLabLogo from "../../assets/AnimoLabLogo(White).png";
 
 /**
  * Root component for the Client domain. Handles the landing page and the multi-step commission request form.
