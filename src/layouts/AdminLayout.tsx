@@ -25,12 +25,12 @@ export const ADMIN_NAV = [
   // Resident Makers
   { id: "rm-accounts", label: "RM Accounts", icon: Users, category: "Resident Makers" },
   { id: "tasks", label: "Task Assignment", icon: Layers, category: "Resident Makers" },
-  { id: "announcements", label: "Announcements & Chat", icon: Bell, category: "Resident Makers" },
+  { id: "announcements", label: "Announcements", icon: Bell, category: "Resident Makers" },
   { id: "modules", label: "Modules", icon: Book, category: "Resident Makers" },
   { id: "faq", label: "FAQ Management", icon: HelpCircle, category: "Resident Makers" },
   
   // Settings
-  { id: "profile", label: "Admin Profile", icon: User, category: "Settings" },
+  { id: "profile", label: "Profile", icon: User, category: "Settings" },
 ];
 
 /**
