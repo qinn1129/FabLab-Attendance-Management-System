@@ -8,7 +8,7 @@ import { ProgressBar } from "../../components/client/ProgressBar";
 import { Input, Select } from "../../components/common";
 import { sheetsService, type Commission } from "../../services/sheetsService";
 import { sendAdminNotificationEmail, sendClientQueueNotificationEmail } from "../../services/emailService";
-import animoLabLogo from "../../assets/AnimoLabLogo(White).png";
+import animoLabLogo from "../../assets/AnimoLabLogo.png";
 
 /**
  * Root component for the Client domain. Handles the landing page and the multi-step commission request form.
@@ -77,37 +77,6 @@ export function ClientPortal({
     ? "Please specify your purpose."
     : "";
 
-  // Expected pickup date validation - must be at least 2 days from today
-  const getMinimumPickupDate = () => {
-    const today = new Date();
-    const minDate = new Date(today);
-    minDate.setDate(today.getDate() + 2); // At least 2 days ahead
-    return minDate;
-  };
-
-  // Format date as YYYY-MM-DD for HTML date input
-  const formatDateForInput = (date: Date) => {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, "0");
-    const day = String(date.getDate()).padStart(2, "0");
-    return `${year}-${month}-${day}`;
-  };
-
-  const minimumPickupDateString = formatDateForInput(getMinimumPickupDate());
-
-  const pickupDateError = form.expectedPickupDate
-    ? (() => {
-        const selectedDate = new Date(form.expectedPickupDate);
-        const minDate = getMinimumPickupDate();
-        // Compare just the date parts (not time)
-        const selectedDateOnly = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate());
-        const minDateOnly = new Date(minDate.getFullYear(), minDate.getMonth(), minDate.getDate());
-        return selectedDateOnly < minDateOnly
-          ? "Expected pickup date must be at least 2 days from today."
-          : "";
-      })()
-    : "";
-
   const colorOptions = ["Black", "White", "Red", "Blue", "Green", "Yellow", "Orange", "Purple", "Pink", "Gray", "Brown", "Transparent"];
   const materialColor = form.color === "Single Color"
     ? form.selectedColor
@@ -161,7 +130,6 @@ export function ClientPortal({
       if (colorOtherError) return false;
       if (driveLinkError) return false;
       if (!form.expectedPickupDate) return false;
-      if (pickupDateError) return false;
       if (!form.pickupOption) return false;
       return true;
     }
@@ -288,12 +256,12 @@ export function ClientPortal({
         </div>
 
 
-        <header className="px-6 py-4 flex items-center justify-between border-b border-gray-100">
+        <header className="px-6 py-4 flex items-center justify-between bg-[#7c3aed] border-b border-purple-700">
           <div className="flex items-center gap-2">
             <img src={animoLabLogo} alt="Animo Labs" className="w-10 h-10 object-contain" />
-            <span className="font-bold text-gray-900 text-lg tracking-tight">Animo Labs - DLSU Science Foundation Inc.</span>
+            <span className="font-bold text-white text-lg tracking-tight">Animo Labs - DLSU Science Foundation Inc.</span>
           </div>
-          <button onClick={onBack} className="text-gray-500 hover:text-gray-900 text-sm font-medium transition">Back to Home</button>
+          <button onClick={onBack} className="text-white hover:text-gray-100 text-sm font-medium transition">Back to Home</button>
         </header>
         <main>
           <HeroSection onStart={() => {
@@ -637,11 +605,9 @@ export function ClientPortal({
                     onChange={v => setForm({ ...form, expectedPickupDate: v })}
                     placeholder=""
                     required
-                    min={minimumPickupDateString}
-                    error={pickupDateError}
                   />
                   <p className="text-xs text-amber-600/80 italic mt-0.5">
-                    "Actual completion and delivery time vary depending on design complexity, print quantity, and project requirements."
+                    “Actual completion and delivery time vary depending on design complexity, print quantity, and project requirements.”
                   </p>
                 </div>
 
@@ -704,7 +670,7 @@ export function ClientPortal({
                     error={driveLinkError}
                   />
                   <p className="text-xs text-gray-500">
-                    Please ensure sharing is set to "Anyone with the link can view".
+                    Please ensure sharing is set to “Anyone with the link can view”.
                   </p>
                 </div>
               </div>
