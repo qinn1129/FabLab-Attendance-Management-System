@@ -6,6 +6,7 @@ import { sheetsService, type WeeklySchedule, type AttendanceRequest } from "../.
 import { ALL_DLSU_PROGRAMS } from "../../constants/DLSUPrograms";
 import { useDialog } from "../../components/common";
 import { Clock, AlertTriangle } from "lucide-react";
+import { formatDateOnly } from "../../lib/dateFormat";
 
 const dayMap: Record<string, string> = {
   "Mon": "Monday",
@@ -39,20 +40,6 @@ function formatRangeTo12H(rangeStr: string): string {
   };
   
   return `${convert(parts[0])} - ${convert(parts[1])}`;
-}
-
-function formatRequestDate(dateStr: string): string {
-  if (!dateStr) return "—";
-  const isYYYYMMDD = /^\d{4}-\d{2}-\d{2}$/.test(dateStr);
-  const parsedDate = isYYYYMMDD ? new Date(dateStr + "T00:00:00") : new Date(dateStr);
-  
-  if (isNaN(parsedDate.getTime())) return dateStr;
-  
-  return parsedDate.toLocaleDateString(undefined, { 
-    year: 'numeric', 
-    month: 'short', 
-    day: 'numeric' 
-  });
 }
 
 /**
@@ -352,7 +339,7 @@ export function AdminRMAccounts() {
                     <div className="flex items-center gap-2 mb-1">
                       <span className="font-semibold text-foreground text-sm">{makerName}</span>
                       <span className="bg-orange-500/10 text-orange-600 border border-orange-500/20 text-xs font-medium px-2 py-0.5 rounded">{r.type}</span>
-                      <span className="text-muted-foreground text-xs font-mono ml-2">{formatRequestDate(r.date)}</span>
+                      <span className="text-muted-foreground text-xs font-mono ml-2">{formatDateOnly(r.date)}</span>
                     </div>
                     <p className="text-muted-foreground text-sm">{r.reason}</p>
                   </div>

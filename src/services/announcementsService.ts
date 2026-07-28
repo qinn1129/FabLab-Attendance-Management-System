@@ -1,3 +1,5 @@
+import { formatDateTime } from "../lib/dateFormat";
+
 export interface Announcement {
   id: string;
   title: string;
@@ -46,7 +48,7 @@ export const announcementsService = {
       id: `ANN-${Date.now()}`,
       title,
       body,
-      date: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+      date: formatDateTime(new Date()),
       pinned,
       createdAt: new Date().toISOString(),
     };

@@ -185,6 +185,7 @@ export const sheetsService = {
   ): Promise<Commission> {
     const newCommission: Commission = {
       ...form,
+      submitted: new Date().toISOString(),
       rm: null,
       printer: null,
       status: "Awaiting Approval",

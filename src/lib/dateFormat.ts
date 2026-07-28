@@ -1,46 +1,70 @@
 /**
- * Formats an ISO timestamp into a readable "Today · 3:45 PM" /
- * "Yesterday · 3:45 PM" / "Jul 21, 2026 · 3:45 PM" string.
+ * Canonical date-time formatter used everywhere in the app that displays
+ * a specific moment in time (timestamps, submission dates, chat messages,
+ * reservation bookings, etc).
+ *
+ * Produces: "April 13, 2026, 12:30 PM"
  */
-export function formatSmartTimestamp(iso?: string): string {
-  if (!iso) return "—";
-  const date = new Date(iso);
+export function formatDateTime(input?: string | Date | null): string {
+  if (!input) return "—";
+  const date = typeof input === "string" ? new Date(input) : input;
   if (isNaN(date.getTime())) return "—";
 
-  const now = new Date();
-  const isToday =
-    date.getFullYear() === now.getFullYear() &&
-    date.getMonth() === now.getMonth() &&
-    date.getDate() === now.getDate();
+  const month = date.toLocaleDateString("en-US", { month: "long" });
+  const day = date.getDate();
+  const year = date.getFullYear();
 
-  const yesterday = new Date(now);
-  yesterday.setDate(now.getDate() - 1);
-  const isYesterday =
-    date.getFullYear() === yesterday.getFullYear() &&
-    date.getMonth() === yesterday.getMonth() &&
-    date.getDate() === yesterday.getDate();
+  let hours = date.getHours();
+  const minutes = date.getMinutes();
+  const ampm = hours >= 12 ? "PM" : "AM";
+  hours = hours % 12;
+  if (hours === 0) hours = 12;
+  const mm = String(minutes).padStart(2, "0");
 
-  const time = date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-
-  if (isToday) return `Today · ${time}`;
-  if (isYesterday) return `Yesterday · ${time}`;
-
-  const day = date.toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" });
-  return `${day} · ${time}`;
+  return `${month} ${day}, ${year}, ${hours}:${mm} ${ampm}`;
 }
 
-/** Shorter variant for tight chat bubbles: time-only if today, else "Jul 21 · 3:45 PM". */
+/**
+ * Same canonical style but without a time component, for fields that only
+ * ever store a calendar date with no meaningful time-of-day (e.g. attendance
+ * request dates, expected pickup dates).
+ *
+ * Produces: "April 13, 2026"
+ */
+export function formatDateOnly(input?: string | Date | null): string {
+  if (!input) return "—";
+
+  // Treat bare "YYYY-MM-DD" strings as local dates so we don't lose a day
+  // to UTC-shift when the browser parses them as midnight UTC.
+  let date: Date;
+  if (typeof input === "string" && /^\d{4}-\d{2}-\d{2}$/.test(input)) {
+    date = new Date(input + "T00:00:00");
+  } else {
+    date = typeof input === "string" ? new Date(input) : input;
+  }
+  if (isNaN(date.getTime())) return "—";
+
+  const month = date.toLocaleDateString("en-US", { month: "long" });
+  const day = date.getDate();
+  const year = date.getFullYear();
+  return `${month} ${day}, ${year}`;
+}
+
+/**
+ * Builds a Date from a calendar day plus a "H:MM" / "HH:MM" time-of-day
+ * string, useful for combining a reservation's day with its slot minutes
+ * before running it through formatDateTime.
+ */
+export function combineDateAndTime(day: Date, hours: number, minutes: number): Date {
+  return new Date(day.getFullYear(), day.getMonth(), day.getDate(), hours, minutes);
+}
+
+/** @deprecated kept for backward compatibility — now returns the full canonical format. */
+export function formatSmartTimestamp(iso?: string): string {
+  return formatDateTime(iso);
+}
+
+/** @deprecated kept for backward compatibility — now returns the full canonical format. */
 export function formatChatTimestamp(iso?: string): string {
-  if (!iso) return "";
-  const date = new Date(iso);
-  if (isNaN(date.getTime())) return "";
-  const now = new Date();
-  const isToday =
-    date.getFullYear() === now.getFullYear() &&
-    date.getMonth() === now.getMonth() &&
-    date.getDate() === now.getDate();
-  const time = date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-  if (isToday) return time;
-  const day = date.toLocaleDateString([], { month: "short", day: "numeric" });
-  return `${day} · ${time}`;
+  return formatDateTime(iso);
 }

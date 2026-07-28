@@ -3,6 +3,7 @@ import { Plus, Pin, PinOff, Trash2, Edit2, Check, X } from "lucide-react";
 import { PageHeader, Input } from "../../components/common";
 import { announcementsService, type Announcement } from "../../services/announcementsService";
 import { formatSmartTimestamp } from "../../lib/dateFormat";
+import { cn } from "../../lib/utils";
 
 export function AdminAnnouncements() {
   const [anns, setAnns] = useState<Announcement[]>([]);
@@ -159,7 +160,7 @@ export function AdminAnnouncements() {
                       <div className="flex items-center gap-2 mb-1">
                         {a.pinned && <Pin className="w-3.5 h-3.5 text-emerald-500" />}
                         <h3 className="font-semibold text-card-foreground text-sm">{a.title}</h3>
-                        <span className="text-muted-foreground text-xs font-mono ml-auto" title={a.createdAt}>
+                        <span className="text-muted-foreground text-xs font-mono ml-auto" title={formatSmartTimestamp(a.createdAt)}>
                           {formatSmartTimestamp(a.createdAt)}
                         </span>
                       </div>

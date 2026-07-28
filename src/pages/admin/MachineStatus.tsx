@@ -4,6 +4,7 @@ import { PageHeader } from "../../components/common";
 import { sheetsService, type Machine, type MachineReservation } from "../../services/sheetsService";
 import { accountsService, type Account } from "../../services/accountsService";
 import { cn } from "../../lib/utils";
+import { formatDateTime } from "../../lib/dateFormat";
 
 /**
  * Real-time-ish status monitor for lab machines, derived from the
@@ -143,7 +144,7 @@ export function AdminMachineStatus() {
                       <span className="font-medium">{status.makerName}</span>
                     </div>
                     <p className="text-[11px] text-muted-foreground font-mono">
-                      Free at {status.endsAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                      Free at {formatDateTime(status.endsAt)}
                     </p>
                   </div>
                 )}

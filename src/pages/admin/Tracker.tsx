@@ -5,6 +5,8 @@ import { PageHeader, StatusBadge } from "../../components/common";
 import { accountsService, type Account } from "../../services/accountsService";
 import { type Commission } from "../../services/sheetsService";
 import { sendRMAssignmentEmail, sendRMUnassignedEmail } from "../../services/emailService";
+import { cn } from "../../lib/utils";
+import { formatDateOnly } from "../../lib/dateFormat";
 
 /**
  * Renders the full Commission Tracker for Admins to view and assign.
@@ -171,7 +173,9 @@ export function AdminTracker({
                         className="text-xs border border-border bg-background text-foreground rounded px-1.5 py-1 outline-none focus:ring-1 focus:ring-emerald-400 w-full"
                       />
                     ) : (
-                      <span className="font-mono text-xs text-muted-foreground">{c.deadline || <span className="text-muted-foreground/30">—</span>}</span>
+                      <span className="font-mono text-xs text-muted-foreground">
+                        {c.deadline ? formatDateOnly(c.deadline) : <span className="text-muted-foreground/30">—</span>}
+                      </span>
                     )}
                   </td>
 

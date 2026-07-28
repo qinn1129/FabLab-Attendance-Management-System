@@ -3,6 +3,7 @@ import { Clock, AlertTriangle, Calendar, Save, Trash2, Check } from "lucide-reac
 import { PageHeader, Select, Input, useDialog } from "../../components/common";
 import { cn } from "../../lib/utils";
 import { accountsService, parseScheduleDays, stringifyScheduleDays, type Account } from "../../services/accountsService";
+import { formatDateTime } from "../../lib/dateFormat";
 import { sheetsService, type AttendanceLog, type AttendanceRequest } from "../../services/sheetsService";
 
 const dayMap: Record<string, string> = {
@@ -523,11 +524,11 @@ export function MakerAttendance({
               {currentTime.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
             </p>
             <p className="text-muted-foreground text-sm mb-2">{currentTime.toLocaleDateString([], { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
-            {clockedIn && activeSession && (
-              <p className="text-emerald-500 text-sm font-medium bg-emerald-500/10 px-3 py-1 rounded-full w-fit mx-auto mt-2 border border-emerald-500/20">
-                Clocked in at {new Date(activeSession.clock_in_timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-              </p>
-            )}
+              {clockedIn && activeSession && (
+                <p className="text-emerald-500 text-sm font-medium bg-emerald-500/10 px-3 py-1 rounded-full w-fit mx-auto mt-2 border border-emerald-500/20">
+                  Clocked in at {formatDateTime(activeSession.clock_in_timestamp)}
+                </p>
+              )}
           </div>
           <button
             onClick={clockedIn ? handleClockOut : handleClockIn}

@@ -3,6 +3,7 @@ import { Star, Check, X, Trash2 } from "lucide-react";
 import { PageHeader, StatusBadge, useDialog } from "../../components/common";
 import { testimonialsService, type Testimonial } from "../../services/testimonialsService";
 import { cn } from "../../lib/utils";
+import { formatDateTime } from "../../lib/dateFormat";
 
 /**
  * Testimonial approval view for Admins.
@@ -120,7 +121,7 @@ export function AdminTestimonials() {
                   </div>
                   <p className="text-muted-foreground text-sm leading-relaxed">&ldquo;{t.text}&rdquo;</p>
                   <p className="text-[10px] text-muted-foreground/60 font-mono mt-1.5">
-                    {t.submittedAt ? new Date(t.submittedAt).toLocaleString() : "—"}
+                    {formatDateTime(t.submittedAt)}
                   </p>
                 </div>
                 <div className="flex gap-1.5 flex-shrink-0">

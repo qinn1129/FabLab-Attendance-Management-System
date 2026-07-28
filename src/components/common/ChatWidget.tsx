@@ -3,6 +3,7 @@ import { X, Send, MessageCircle, MessageSquare, Megaphone } from "lucide-react";
 import { chatService, type ChatMessage } from "../../services/chatService";
 import { accountsService } from "../../services/accountsService";
 import { cn } from "../../lib/utils";
+import { formatDateTime } from "../../lib/dateFormat";
 
 /**
  * Props for the ChatWidget component.
@@ -39,12 +40,9 @@ function initialsFor(name: string | undefined | null): string {
 }
 
 function formatTime(iso: string): string {
-  try {
-    return new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-  } catch {
-    return "";
-  }
+  return formatDateTime(iso);
 }
+
 
 /** Escapes a string for safe use inside a RegExp. */
 function escapeRegExp(s: string): string {

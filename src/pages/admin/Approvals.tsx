@@ -4,11 +4,15 @@ import { PageHeader, useDialog } from "../../components/common";
 import { type Commission } from "../../services/sheetsService";
 import { sendCommissionConfirmationEmail, sendCommissionRejectionEmail, sendRMAssignmentEmail } from "../../services/emailService";
 import { accountsService, type Account } from "../../services/accountsService";
+import { formatDateTime, formatDateOnly } from "../../lib/dateFormat";
 
 /**
  * Renders the Commission Approvals view for Admins. Approving opens a modal
  * asking whether to auto-assign (least active-task workload) or manually
- * pick a specific Resident Maker.
+ * pick a specific Resident Maker. Rejecting opens a reason prompt — the
+ * commission is ONLY marked Rejected if the admin actually confirms the
+ * prompt; cancelling it (even with an empty reason cancel) leaves the
+ * commission untouched.
  * Domain: Admin
  */
 export function AdminApprovals({
@@ -26,6 +30,7 @@ export function AdminApprovals({
   const [assignMode, setAssignMode] = useState<"auto" | "manual">("auto");
   const [selectedMakerId, setSelectedMakerId] = useState<string>("");
   const [confirming, setConfirming] = useState(false);
+  const [rejectingId, setRejectingId] = useState<string | null>(null);
 
   async function openApproveModal(id: string) {
     const commission = commissions.find(c => c.id === id);
@@ -103,25 +108,38 @@ export function AdminApprovals({
     closeApproveModal();
   }
 
+  /**
+   * Opens a reason prompt for rejecting a commission. The commission is
+   * ONLY rejected if the admin clicks the prompt's "Reject" confirm button —
+   * clicking Cancel (or closing the dialog) resolves the promise with
+   * `null` and this function returns immediately without touching the
+   * commission's status.
+   */
   const handleReject = async (id: string) => {
-    const commission = commissions.find(c => c.id === id);
+    if (rejectingId) return; // guard against double-clicks opening two prompts
+    setRejectingId(id);
 
-    const reason = await prompt({
-      title: "Reject Commission",
-      message: "Reason for rejection (optional — shown to the client):",
-      placeholder: "e.g. Insufficient details, material unavailable...",
-      confirmLabel: "Reject",
-      cancelLabel: "Cancel",
-      multiline: true,
-    });
+    try {
+      const reason = await prompt({
+        title: "Reject Commission",
+        message: "Reason for rejection (optional — shown to the client):",
+        placeholder: "e.g. Insufficient details, material unavailable...",
+        confirmLabel: "Reject",
+        cancelLabel: "Cancel",
+        multiline: true,
+      });
 
-    // User cancelled the dialog entirely — don't reject.
-    if (reason === null) return;
+      // `null` means the admin cancelled the dialog — do NOT reject.
+      if (reason === null) return;
 
-    await onUpdate(id, { status: "Rejected" });
+      const commission = commissions.find(c => c.id === id);
+      await onUpdate(id, { status: "Rejected" });
 
-    if (commission) {
-      await sendCommissionRejectionEmail(commission.client, commission.clientEmail, commission, reason);
+      if (commission) {
+        await sendCommissionRejectionEmail(commission.client, commission.clientEmail, commission, reason);
+      }
+    } finally {
+      setRejectingId(null);
     }
   };
 
@@ -192,13 +210,16 @@ export function AdminApprovals({
                 {/*Expected Pickup Date*/}
                 <div>
                   <p className="text-xs text-muted-foreground">Pickup Date</p>
-                  <p className="text-sm font-mono text-card-foreground">{item.expectedPickupDate || "—"}</p>
+                  <p className="text-sm font-mono text-card-foreground">
+                    {/* Fixed this to use formatDateOnly */}
+                    {item.expectedPickupDate ? formatDateOnly(item.expectedPickupDate) : "—"}
+                  </p>
                 </div>
 
                 {/*Submitted*/}
                 <div>
                   <p className="text-xs text-muted-foreground">Submitted</p>
-                  <p className="text-sm font-mono text-muted-foreground">{item.submitted}</p>
+                  <p className="text-sm font-mono text-muted-foreground">{formatDateTime(item.submitted)}</p>
                 </div>
               </div>
 
@@ -208,7 +229,11 @@ export function AdminApprovals({
                   <Check className="w-3.5 h-3.5" /> Approve
                 </button>
 
-                <button onClick={() => handleReject(item.id)} className="px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-500 text-xs font-semibold rounded-lg border border-red-500/20 transition flex items-center gap-1">
+                <button
+                  onClick={() => handleReject(item.id)}
+                  disabled={rejectingId === item.id}
+                  className="px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-500 text-xs font-semibold rounded-lg border border-red-500/20 transition flex items-center gap-1 disabled:opacity-40"
+                >
                   <X className="w-3.5 h-3.5" /> Reject
                 </button>
               </div>
