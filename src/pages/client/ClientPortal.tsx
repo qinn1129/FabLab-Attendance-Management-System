@@ -157,7 +157,7 @@ export function ClientPortal({
       const nextIdNum = maxIdNum + 1;
       const nextId = `COM-${nextIdNum.toString().padStart(3, "0")}`;
 
-      const submittedDate = new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" });
+      const submittedDate = new Date().toISOString();
 
       const newCommission = {
         id: nextId,

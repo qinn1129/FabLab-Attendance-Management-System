@@ -5,6 +5,7 @@ import { type Commission } from "../../services/sheetsService";
 import { sendCommissionConfirmationEmail, sendCommissionRejectionEmail, sendRMAssignmentEmail } from "../../services/emailService";
 import { accountsService, type Account } from "../../services/accountsService";
 import { formatDateTime, formatDateOnly } from "../../lib/dateFormat";
+import { tasksService, pickLeastBusyMakerId } from "../../services/tasksService";
 
 /**
  * Renders the Commission Approvals view for Admins. Approving opens a modal
@@ -60,18 +61,17 @@ export function AdminApprovals({
 
     if (makers.length > 0) {
       if (assignMode === "auto") {
-        // Least-active-task auto-assignment
-        const rmCounts = makers.map(rm => {
-          const rmName = `${rm.firstName} ${rm.lastName}`;
-          const activeJobsCount = commissions.filter(c =>
-            c.rm === rmName && (c.status === "Pending" || c.status === "In Progress")
-          ).length;
-          return { id: rm.id, name: rmName, email: rm.email, count: activeJobsCount };
-        });
-        rmCounts.sort((a, b) => a.count - b.count);
-        assignedRM = rmCounts[0].name;
-        assignedRMEmail = rmCounts[0].email;
-        assignedRMId = rmCounts[0].id;
+        // Fetch active tasks and use the helper to find the least busy RM
+        const tasks = await tasksService.fetchTasks();
+        const activeMakerIds = makers.map(m => m.id);
+        const leastBusyId = pickLeastBusyMakerId(activeMakerIds, tasks);
+        
+        const chosen = makers.find(m => m.id === leastBusyId);
+        if (chosen) {
+          assignedRM = `${chosen.firstName} ${chosen.lastName}`;
+          assignedRMEmail = chosen.email;
+          assignedRMId = chosen.id;
+        }
       } else {
         const chosen = makers.find(m => m.id === selectedMakerId);
         if (chosen) {
@@ -84,6 +84,15 @@ export function AdminApprovals({
 
     await onUpdate(commission.id, { status: "Pending", rm: assignedRM });
 
+    if (assignedRMId) {
+      await tasksService.addTask({
+        rm_id: assignedRMId,
+        task: `Commission: ${commission.id} - ${commission.service}`,
+        deadline: commission.expectedPickupDate || "Not Set",
+        source: assignMode === "auto" ? "Auto" : "Manual"
+      });
+    }
+
     if (assignedRM) {
       setAssignedNotice(
         `Request ${commission.id} approved and ${assignMode === "auto" ? "auto-assigned" : "assigned"} to ${assignedRM}.`
@@ -92,14 +101,14 @@ export function AdminApprovals({
       setAssignedNotice(`Request ${commission.id} approved (No active Resident Makers available for assignment).`);
     }
 
-    // Client confirmation email
+    // 3. Send client confirmation email
     await sendCommissionConfirmationEmail(
       commission.client,
       commission.clientEmail,
       { ...commission, status: "Pending", rm: assignedRM }
     );
 
-    // Notify the assigned RM directly
+    // 4. Notify the assigned RM directly
     if (assignedRM && assignedRMEmail) {
       await sendRMAssignmentEmail(assignedRM, assignedRMEmail, commission.id, commission.client, commission.service);
     }
@@ -108,15 +117,8 @@ export function AdminApprovals({
     closeApproveModal();
   }
 
-  /**
-   * Opens a reason prompt for rejecting a commission. The commission is
-   * ONLY rejected if the admin clicks the prompt's "Reject" confirm button —
-   * clicking Cancel (or closing the dialog) resolves the promise with
-   * `null` and this function returns immediately without touching the
-   * commission's status.
-   */
   const handleReject = async (id: string) => {
-    if (rejectingId) return; // guard against double-clicks opening two prompts
+    if (rejectingId) return; 
     setRejectingId(id);
 
     try {
@@ -129,7 +131,6 @@ export function AdminApprovals({
         multiline: true,
       });
 
-      // `null` means the admin cancelled the dialog — do NOT reject.
       if (reason === null) return;
 
       const commission = commissions.find(c => c.id === id);
@@ -190,12 +191,12 @@ export function AdminApprovals({
                   <p className="text-sm text-card-foreground truncate">{item.clientEmail}</p>
                 </div>
 
-                {/*Drive Link*/}
+                {/*Drive Link - Updated to check item.file for URLs*/}
                 <div>
                   <p className="text-xs text-muted-foreground">Drive Link</p>
-                  {item.driveLink ? (
+                  {item.driveLink || (item.file && item.file.startsWith("http")) ? (
                     <a
-                      href={item.driveLink}
+                      href={item.driveLink || item.file}
                       target="_blank"
                       rel="noreferrer"
                       className="text-sm text-blue-500 hover:text-blue-600 underline font-medium"
@@ -211,7 +212,6 @@ export function AdminApprovals({
                 <div>
                   <p className="text-xs text-muted-foreground">Pickup Date</p>
                   <p className="text-sm font-mono text-card-foreground">
-                    {/* Fixed this to use formatDateOnly */}
                     {item.expectedPickupDate ? formatDateOnly(item.expectedPickupDate) : "—"}
                   </p>
                 </div>
