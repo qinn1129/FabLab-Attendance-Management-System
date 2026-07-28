@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Clock, AlertTriangle, Calendar, Save, Trash2, Check } from "lucide-react";
-import { PageHeader, Select, Input } from "../../components/common";
+import { PageHeader, Select, Input, useDialog } from "../../components/common";
 import { cn } from "../../lib/utils";
 import { accountsService, parseScheduleDays, stringifyScheduleDays, type Account } from "../../services/accountsService";
 import { sheetsService, type AttendanceLog, type AttendanceRequest } from "../../services/sheetsService";
@@ -146,6 +146,7 @@ export function MakerAttendance({
   account: Account;
   onAccountUpdate: (account: Account) => void;
 }) {
+  const { alert: showAlert } = useDialog();
   const [clockedIn, setClockedIn] = useState(false);
   const [activeSession, setActiveSession] = useState<AttendanceLog | null>(null);
   const [loadingSession, setLoadingSession] = useState(false);
@@ -263,7 +264,7 @@ export function MakerAttendance({
       setClockedIn(true);
     } catch (err) {
       console.error("Error clocking in:", err);
-      alert("Failed to clock in. Please try again.");
+      await showAlert({ title: "Clock In Failed", message: "Failed to clock in. Please try again." });
     } finally {
       setLoadingSession(false);
     }
@@ -314,7 +315,7 @@ export function MakerAttendance({
       setClockedIn(false);
     } catch (err) {
       console.error("Error clocking out:", err);
-      alert("Failed to clock out. Please try again.");
+      await showAlert({ title: "Clock Out Failed", message: "Failed to clock out. Please try again." });
     } finally {
       setLoadingSession(false);
     }
@@ -450,7 +451,7 @@ export function MakerAttendance({
       setTimeout(() => setScheduleSaved(""), 3000);
     } catch (err) {
       console.error(err);
-      alert("Failed to save schedule.");
+      await showAlert({ title: "Save Failed", message: "Failed to save schedule." });
     } finally {
       setSavingActiveDay(false);
     }
@@ -470,7 +471,7 @@ export function MakerAttendance({
     setSavingSchedule(false);
     if (!result.success) {
       setScheduleSaved(""); // clear on failure — reuse a dedicated error state if you prefer
-      alert(result.error || "Failed to save schedule.");
+      await showAlert({ title: "Save Failed", message: result.error || "Failed to save schedule." });
       return;
     }
     setScheduleSaved("Schedule saved!");
@@ -479,7 +480,7 @@ export function MakerAttendance({
 
   const submitRequest = async () => {
     if (!reqForm.type || !reqForm.date || !reqForm.reason.trim()) {
-      alert("Please fill in all fields (type, date, and reason).");
+      await showAlert({ title: "Missing Information", message: "Please fill in all fields (type, date, and reason)." });
       return;
     }
     const newRequest: AttendanceRequest = {
@@ -497,7 +498,7 @@ export function MakerAttendance({
       setTimeout(() => setRequestSubmitted(""), 4000);
     } catch (err) {
       console.error(err);
-      alert("Failed to submit request.");
+      await showAlert({ title: "Submission Failed", message: "Failed to submit request." });
     }
   };
 

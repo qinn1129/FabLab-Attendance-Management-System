@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Star, Check, X, Trash2 } from "lucide-react";
-import { PageHeader, StatusBadge } from "../../components/common";
+import { PageHeader, StatusBadge, useDialog } from "../../components/common";
 import { testimonialsService, type Testimonial } from "../../services/testimonialsService";
 import { cn } from "../../lib/utils";
 
@@ -10,6 +10,7 @@ import { cn } from "../../lib/utils";
  * @returns {JSX.Element}
  */
 export function AdminTestimonials() {
+  const { confirm } = useDialog();
   const [items, setItems] = useState<Testimonial[]>([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<"Pending" | "Approved" | "Rejected" | "All">("Pending");
@@ -47,9 +48,23 @@ export function AdminTestimonials() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!window.confirm("Permanently delete this testimonial?")) return;
+    const ok = await confirm({
+      title: "Delete Testimonial",
+      message: "Are you sure you want to permanently delete this testimonial? This cannot be undone.",
+      confirmLabel: "Delete",
+      cancelLabel: "Cancel",
+      danger: true,
+    });
+    if (!ok) return;
+
+    setActionError("");
     setItems(i => i.filter(x => x.id !== id));
-    await testimonialsService.deleteTestimonial(id);
+    try {
+      await testimonialsService.deleteTestimonial(id);
+    } catch {
+      setActionError("Failed to delete testimonial.");
+      load();
+    }
   };
 
   const filtered = items.filter(t => tab === "All" || t.status === tab);

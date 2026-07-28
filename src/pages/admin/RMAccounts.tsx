@@ -4,6 +4,7 @@ import { cn } from "../../lib/utils";
 import { accountsService, type Account } from "../../services/accountsService";
 import { sheetsService, type WeeklySchedule, type AttendanceRequest } from "../../services/sheetsService";
 import { ALL_DLSU_PROGRAMS } from "../../constants/DLSUPrograms";
+import { useDialog } from "../../components/common";
 import { Clock, AlertTriangle } from "lucide-react";
 
 const dayMap: Record<string, string> = {
@@ -60,6 +61,7 @@ function formatRequestDate(dateStr: string): string {
  * @returns {JSX.Element}
  */
 export function AdminRMAccounts() {
+  const { confirm } = useDialog();
   const [tab, setTab] = useState<"list"|"schedules"|"requests"|"register">("list");
   const [regForm, setRegForm] = useState({ firstName: "", lastName: "", email: "", password: "", program: "", year: "" });
   const [regError, setRegError] = useState("");
@@ -120,7 +122,13 @@ export function AdminRMAccounts() {
   };
 
   const handleDeactivate = async (id: string) => {
-    if (!window.confirm("Are you sure that you want to deactivate this account?")) return;
+    const ok = await confirm({
+      title: "Deactivate Account",
+      message: "Are you sure that you want to deactivate this account?",
+      confirmLabel: "Deactivate",
+      danger: true,
+    });
+    if (!ok) return;
     setActionError("");
     const result = await accountsService.updateAccount(id, { status: "Inactive" });
     if (!result.success) {

@@ -4,6 +4,7 @@ import { ClientPortal } from "./pages/client/ClientPortal";
 import { AdminPortal } from "./pages/admin/AdminPortal";
 import { MakerPortal } from "./pages/maker/MakerPortal";
 import { sheetsService, type Commission } from "./services/sheetsService";
+import { DialogProvider } from "./components/common";
 
 /**
  * Main application entry point that handles top-level routing between the 
@@ -44,33 +45,34 @@ export default function App() {
   };
 
   return (
-    <div className="h-screen w-full overflow-auto" style={{ fontFamily: "'Inter', system-ui, sans-serif" }}>
-      {flow === "home" && <Home setFlow={setFlow} />}
-      {flow === "client" && (
-        <ClientPortal 
-          onBack={() => setFlow("home")} 
-          commissions={commissions} 
-          onAdd={handleAddCommission} 
-          isLoading={loading} 
-        />
-      )}
-      {flow === "admin" && (
-        <AdminPortal 
-          onBack={() => setFlow("home")} 
-          commissions={commissions} 
-          onUpdate={handleUpdateCommission} 
-          isLoading={loading} 
-        />
-      )}
-      {flow === "rm" && (
-        <MakerPortal 
-          onBack={() => setFlow("home")} 
-          commissions={commissions} 
-          onUpdate={handleUpdateCommission} 
-          isLoading={loading} 
-        />
-      )}
-    </div>
+    <DialogProvider>
+      <div className="h-screen w-full overflow-auto" style={{ fontFamily: "'Inter', system-ui, sans-serif" }}>
+        {flow === "home" && <Home setFlow={setFlow} />}
+        {flow === "client" && (
+          <ClientPortal 
+            onBack={() => setFlow("home")} 
+            commissions={commissions} 
+            onAdd={handleAddCommission} 
+            isLoading={loading} 
+          />
+        )}
+        {flow === "admin" && (
+          <AdminPortal 
+            onBack={() => setFlow("home")} 
+            commissions={commissions} 
+            onUpdate={handleUpdateCommission} 
+            isLoading={loading} 
+          />
+        )}
+        {flow === "rm" && (
+          <MakerPortal 
+            onBack={() => setFlow("home")} 
+            commissions={commissions} 
+            onUpdate={handleUpdateCommission} 
+            isLoading={loading} 
+          />
+        )}
+      </div>
+    </DialogProvider>
   );
 }
-

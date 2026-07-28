@@ -16,7 +16,7 @@ import {
   X,
   Check
 } from "lucide-react";
-import { PageHeader } from "../../components/common";
+import { PageHeader, useDialog } from "../../components/common";
 import { cn } from "../../lib/utils";
 import { sheetsService, type Machine, type MachineReservation } from "../../services/sheetsService";
 import { accountsService, type Account } from "../../services/accountsService";
@@ -93,6 +93,7 @@ interface InteractionState {
 }
 
 export function MakerReservations({ account }: { account: Account }) {
+  const { confirm } = useDialog();
   const [machines, setMachines] = useState<Machine[]>([]);
   const [reservations, setReservations] = useState<MachineReservation[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -534,7 +535,13 @@ export function MakerReservations({ account }: { account: Account }) {
   };
 
   const handleCancelReservation = async (resId: string) => {
-    if (!window.confirm("Are you sure you want to cancel this reservation?")) return;
+    const ok = await confirm({
+      title: "Cancel Reservation",
+      message: "Are you sure you want to cancel this reservation?",
+      confirmLabel: "Cancel Reservation",
+      danger: true,
+    });
+    if (!ok) return;
     setErrorMsg("");
     setSuccessMsg("");
     try {

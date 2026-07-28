@@ -4,6 +4,7 @@ import { PageHeader, Select, StatusBadge, Input } from "../../components/common"
 import { accountsService, type Account } from "../../services/accountsService";
 import { tasksService, type RMTask, type RMTaskStatus } from "../../services/tasksService";
 import { type Commission } from "../../services/sheetsService";
+import { useDialog } from "../../components/common";
 import { cn } from "../../lib/utils";
 
 const STATUS_OPTIONS: RMTaskStatus[] = ["Pending", "In Progress", "Completed"];
@@ -30,6 +31,7 @@ interface UnifiedTask {
  * @returns {JSX.Element}
  */
 export function AdminTasks({ commissions }: { commissions: Commission[] }) {
+  const { confirm } = useDialog();
   const [view, setView] = useState<"byRM" | "log">("byRM");
   const [makers, setMakers] = useState<Account[]>([]);
   const [manualTasks, setManualTasks] = useState<RMTask[]>([]);
@@ -119,7 +121,13 @@ export function AdminTasks({ commissions }: { commissions: Commission[] }) {
   }
 
   async function handleDelete(id: string) {
-    if (!window.confirm("Delete this task?")) return;
+    const ok = await confirm({
+      title: "Delete Task",
+      message: "Are you sure you want to delete this task? This cannot be undone.",
+      confirmLabel: "Delete",
+      danger: true,
+    });
+    if (!ok) return;
     setManualTasks(t => t.filter(x => x.id !== id));
     await tasksService.deleteTask(id);
   }

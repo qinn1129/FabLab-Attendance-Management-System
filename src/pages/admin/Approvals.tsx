@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Check, X, User, CheckCircle, Sparkles, Sprout, UserCog } from "lucide-react";
-import { PageHeader } from "../../components/common";
+import { PageHeader, useDialog } from "../../components/common";
 import { type Commission } from "../../services/sheetsService";
 import { sendCommissionConfirmationEmail, sendCommissionRejectionEmail, sendRMAssignmentEmail } from "../../services/emailService";
 import { accountsService, type Account } from "../../services/accountsService";
@@ -18,6 +18,7 @@ export function AdminApprovals({
   commissions: Commission[];
   onUpdate: (id: string, updates: Partial<Commission>) => Promise<void>;
 }) {
+  const { prompt } = useDialog();
   const [assignedNotice, setAssignedNotice] = useState<string | null>(null);
   const items = commissions.filter(c => c.status === "Awaiting Approval");
 
@@ -104,7 +105,18 @@ export function AdminApprovals({
 
   const handleReject = async (id: string) => {
     const commission = commissions.find(c => c.id === id);
-    const reason = window.prompt("Reason for rejection (optional — shown to the client):") || "";
+
+    const reason = await prompt({
+      title: "Reject Commission",
+      message: "Reason for rejection (optional — shown to the client):",
+      placeholder: "e.g. Insufficient details, material unavailable...",
+      confirmLabel: "Reject",
+      cancelLabel: "Cancel",
+      multiline: true,
+    });
+
+    // User cancelled the dialog entirely — don't reject.
+    if (reason === null) return;
 
     await onUpdate(id, { status: "Rejected" });
 
