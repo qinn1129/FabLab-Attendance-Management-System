@@ -1,10 +1,3 @@
-/**
- * Canonical date-time formatter used everywhere in the app that displays
- * a specific moment in time (timestamps, submission dates, chat messages,
- * reservation bookings, etc).
- *
- * Produces: "April 13, 2026, 12:30 PM"
- */
 export function formatDateTime(input?: string | Date | null): string {
   if (!input) return "—";
   const date = typeof input === "string" ? new Date(input) : input;
@@ -24,13 +17,6 @@ export function formatDateTime(input?: string | Date | null): string {
   return `${month} ${day}, ${year}, ${hours}:${mm} ${ampm}`;
 }
 
-/**
- * Same canonical style but without a time component, for fields that only
- * ever store a calendar date with no meaningful time-of-day (e.g. attendance
- * request dates, expected pickup dates).
- *
- * Produces: "April 13, 2026"
- */
 export function formatDateOnly(input?: string | Date | null): string {
   if (!input) return "—";
 
@@ -50,11 +36,6 @@ export function formatDateOnly(input?: string | Date | null): string {
   return `${month} ${day}, ${year}`;
 }
 
-/**
- * Builds a Date from a calendar day plus a "H:MM" / "HH:MM" time-of-day
- * string, useful for combining a reservation's day with its slot minutes
- * before running it through formatDateTime.
- */
 export function combineDateAndTime(day: Date, hours: number, minutes: number): Date {
   return new Date(day.getFullYear(), day.getMonth(), day.getDate(), hours, minutes);
 }
