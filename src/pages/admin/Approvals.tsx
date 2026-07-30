@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { Check, X, User, CheckCircle, Sparkles, Sprout, UserCog } from "lucide-react";
 import { PageHeader, useDialog } from "../../components/common";
 import { type Commission } from "../../services/sheetsService";
@@ -25,7 +25,14 @@ export function AdminApprovals({
 }) {
   const { prompt } = useDialog();
   const [assignedNotice, setAssignedNotice] = useState<string | null>(null);
-  const items = commissions.filter(c => c.status === "Awaiting Approval");
+  const [undoReject, setUndoReject] = useState<{
+    id: string;
+    reason: string;
+    timeLeft: number;
+  } | null>(null);
+  const intervalRef = useRef<any>(null);
+
+  const items = commissions.filter(c => c.status === "Awaiting Approval" && c.id !== undoReject?.id);
 
   const [approveModal, setApproveModal] = useState<{ commission: Commission; makers: Account[] } | null>(null);
   const [assignMode, setAssignMode] = useState<"auto" | "manual">("auto");
@@ -117,6 +124,14 @@ export function AdminApprovals({
     closeApproveModal();
   }
 
+  const commitRejection = async (id: string, reason: string) => {
+    const commission = commissions.find(c => c.id === id);
+    await onUpdate(id, { status: "Rejected" });
+    if (commission) {
+      await sendCommissionRejectionEmail(commission.client, commission.clientEmail, commission, reason);
+    }
+  };
+
   const handleReject = async (id: string) => {
     if (rejectingId) return; 
     setRejectingId(id);
@@ -133,20 +148,65 @@ export function AdminApprovals({
 
       if (reason === null) return;
 
-      const commission = commissions.find(c => c.id === id);
-      await onUpdate(id, { status: "Rejected" });
-
-      if (commission) {
-        await sendCommissionRejectionEmail(commission.client, commission.clientEmail, commission, reason);
+      if (undoReject) {
+        if (intervalRef.current) clearInterval(intervalRef.current);
+        await commitRejection(undoReject.id, undoReject.reason);
       }
+
+      let secondsLeft = 10;
+      setUndoReject({ id, reason, timeLeft: secondsLeft });
+
+      if (intervalRef.current) clearInterval(intervalRef.current);
+      intervalRef.current = setInterval(() => {
+        secondsLeft -= 1;
+        if (secondsLeft <= 0) {
+          clearInterval(intervalRef.current);
+          intervalRef.current = null;
+          commitRejection(id, reason);
+          setUndoReject(null);
+        } else {
+          setUndoReject(prev => prev ? { ...prev, timeLeft: secondsLeft } : null);
+        }
+      }, 1000);
+
     } finally {
       setRejectingId(null);
     }
   };
 
+  const handleUndoReject = () => {
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+    setUndoReject(null);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
+    };
+  }, []);
+
   return (
     <div className="p-6">
       <PageHeader title="Commission Approval" sub={`${items.length} requests awaiting review`} />
+      {undoReject && (
+        <div className="mb-4 p-3 bg-red-500/10 border border-red-500/30 rounded-xl text-red-700 dark:text-red-300 text-xs font-medium flex items-center justify-between animate-in slide-in-from-top-2 duration-300">
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+            <span>Commission {undoReject.id} rejected. Rejection official in {undoReject.timeLeft}s...</span>
+          </div>
+          <button
+            onClick={handleUndoReject}
+            className="px-2.5 py-1 bg-red-600 hover:bg-red-700 text-white rounded-lg transition text-[10px] font-bold uppercase tracking-wider"
+          >
+            Undo
+          </button>
+        </div>
+      )}
       {assignedNotice && (
         <div className="mb-4 p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-emerald-700 dark:text-emerald-300 text-xs font-medium flex items-center justify-between">
           <div className="flex items-center gap-2">

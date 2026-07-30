@@ -35,9 +35,27 @@ export function AdminTracker({
 
   const [makers, setMakers] = useState<Account[]>([]);
 
+  const [filterClient, setFilterClient] = useState("");
+  const [filterService, setFilterService] = useState("");
+  const [filterDate, setFilterDate] = useState("");
+
   useEffect(() => {
     accountsService.fetchResidentMakers().then(setMakers);
   }, []);
+
+  const uniqueServices = Array.from(new Set(commissions.map(c => c.service).filter(Boolean)));
+
+  const filteredCommissions = commissions.filter(c => {
+    const clientName = c.client || "";
+    const serviceName = c.service || "";
+    const expectedDate = c.expectedPickupDate || "";
+    const deadlineDate = c.deadline || "";
+
+    const matchesClient = !filterClient || clientName.toLowerCase().includes(filterClient.toLowerCase());
+    const matchesService = !filterService || serviceName === filterService;
+    const matchesDate = !filterDate || expectedDate === filterDate || deadlineDate === filterDate;
+    return matchesClient && matchesService && matchesDate;
+  });
 
   const startEdit = (c: Commission) => {
     setEditId(c.id);
@@ -126,6 +144,58 @@ export function AdminTracker({
   return (
     <div className="p-6">
       <PageHeader title="Commission Tracker" sub="Full view of all active and completed commissions" />
+      
+      {/* Filters Bar */}
+      <div className="bg-card rounded-xl border border-border p-4 mb-5 flex flex-wrap gap-4 items-center">
+        <div className="flex flex-col gap-1 w-56">
+          <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wide">Filter by Client Name</label>
+          <input
+            type="text"
+            value={filterClient}
+            onChange={e => setFilterClient(e.target.value)}
+            placeholder="Search client..."
+            className="w-full px-3 py-1.5 rounded-lg border border-border bg-background text-sm text-foreground outline-none focus:ring-2 focus:ring-emerald-400"
+          />
+        </div>
+
+        <div className="flex flex-col gap-1 w-56">
+          <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wide">Filter by Service</label>
+          <select
+            value={filterService}
+            onChange={e => setFilterService(e.target.value)}
+            className="w-full px-3 py-1.5 rounded-lg border border-border bg-background text-sm text-foreground outline-none focus:ring-2 focus:ring-emerald-400"
+          >
+            <option value="">All Services</option>
+            {uniqueServices.map(s => (
+              <option key={s} value={s}>{s}</option>
+            ))}
+          </select>
+        </div>
+
+        <div className="flex flex-col gap-1 w-56">
+          <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wide">Filter by Target/Pickup Date</label>
+          <input
+            type="date"
+            value={filterDate}
+            onChange={e => setFilterDate(e.target.value)}
+            className="w-full px-3 py-1.5 rounded-lg border border-border bg-background text-sm text-foreground outline-none focus:ring-2 focus:ring-emerald-400"
+          />
+        </div>
+
+        {(filterClient || filterService || filterDate) && (
+          <button
+            onClick={() => {
+              setFilterClient("");
+              setFilterService("");
+              setFilterDate("");
+            }}
+            className="mt-5 px-3 py-1.5 text-xs font-semibold bg-muted hover:bg-muted/80 text-muted-foreground hover:text-foreground rounded-lg transition border border-border"
+          >
+            Clear Filters
+          </button>
+        )}
+      </div>
+
       <div className="bg-card rounded-xl border border-border overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
@@ -137,10 +207,10 @@ export function AdminTracker({
           </thead>
 
           <tbody>
-            {commissions.map(c => {
+            {filteredCommissions.map((c, index) => {
               const isEditing = editId === c.id;
               return (
-                <tr key={c.id} className="border-b border-muted hover:bg-muted/50 transition">
+                <tr key={`${c.id}-${index}`} className="border-b border-muted hover:bg-muted/50 transition">
                   <td className="px-3 py-2.5 font-mono text-xs text-muted-foreground">{c.id}</td>
                   <td className="px-3 py-2.5 font-medium text-foreground whitespace-nowrap">{c.client}</td>
                   <td className="px-3 py-2.5 text-muted-foreground whitespace-nowrap">{c.service}</td>
