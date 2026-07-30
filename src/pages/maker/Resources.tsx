@@ -46,7 +46,7 @@ export function MakerResources() {
       <div className="flex gap-1 p-1 bg-muted rounded-lg w-fit mb-5">
         {(["schedule","announcements","modules","faq"] as const).map(t => (
           <button key={t} onClick={() => setTab(t)} className={`px-3 py-1.5 rounded-md text-sm font-medium transition capitalize ${tab === t ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-card-foreground"}`}>
-            {t}
+            {t === "faq" ? "FAQ" : t}
           </button>
         ))}
       </div>
