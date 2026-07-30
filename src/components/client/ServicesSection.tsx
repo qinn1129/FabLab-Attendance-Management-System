@@ -15,7 +15,7 @@ export function ServicesSection() {
 
   useEffect(() => {
     servicesService.fetchServices().then(data => {
-      setServices(data);
+      setServices(data.slice(0, 4));
       setLoading(false);
     });
   }, []);

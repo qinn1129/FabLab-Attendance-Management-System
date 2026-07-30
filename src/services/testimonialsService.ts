@@ -63,7 +63,10 @@ export const testimonialsService = {
 
     // Shuffle within each shownCount "tier" so it's not always the same
     // order among equally-fresh testimonials, then sort tiers ascending.
-    const shuffled = [...approved].sort(() => Math.random() - 0.5);
+    const shuffled = approved
+      .map(t => ({ t, r: Math.random() }))
+      .sort((a, b) => a.r - b.r)
+      .map(x => x.t);
     shuffled.sort((a, b) => a.shownCount - b.shownCount);
 
     const selected = shuffled.slice(0, count);

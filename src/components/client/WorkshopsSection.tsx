@@ -15,7 +15,7 @@ export function WorkshopsSection() {
 
   useEffect(() => {
     workshopsService.fetchWorkshops().then(data => {
-      setWorkshops(data);
+      setWorkshops(data.slice(0, 3));
       setLoading(false);
     });
   }, []);

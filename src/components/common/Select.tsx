@@ -11,6 +11,7 @@ interface SelectProps {
   options: string[];
   required?: boolean;
   error?: string;
+  disabled?: boolean;
 }
 
 /**
@@ -18,7 +19,7 @@ interface SelectProps {
  * @param {SelectProps} props
  * @returns {JSX.Element}
  */
-export function Select({ label, value, onChange, options, required, error }: SelectProps) {
+export function Select({ label, value, onChange, options, required, error, disabled }: SelectProps) {
   return (
     <div className="flex flex-col gap-1">
       {label && <label className="text-sm font-medium text-foreground">{label}{required && <span className="text-red-500 ml-0.5">*</span>}</label>}
@@ -26,7 +27,8 @@ export function Select({ label, value, onChange, options, required, error }: Sel
         <select
           value={value}
           onChange={e => onChange(e.target.value)}
-          className={`w-full px-3 py-2 rounded-lg border bg-background text-foreground text-sm outline-none focus:ring-2 focus:ring-violet-400 focus:border-transparent appearance-none transition ${error ? "border-red-300" : "border-border"}`}
+          disabled={disabled}
+          className={`w-full px-3 py-2 rounded-lg border bg-background text-foreground text-sm outline-none focus:ring-2 focus:ring-violet-400 focus:border-transparent appearance-none transition disabled:opacity-50 disabled:cursor-not-allowed ${error ? "border-red-300" : "border-border"}`}
         >
           <option value="">Select...</option>
           {options.map(o => <option key={o} value={o}>{o}</option>)}

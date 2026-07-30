@@ -36,8 +36,8 @@ export function ClientPortal({
     affiliation: "",
     isDlsuStudent: true,
     idNumber: "", program: "", college: "CCS", department: "",
-    service: "", purpose: "Academic / Thesis", purposeOther: "",
-    color: "Single Color", selectedColor: "", selectedColors: [] as string[], colorOther: "", filament: "PLA", expectedPickupDate: "", notes: "",
+    service: "", purpose: "", purposeOther: "",
+    color: "", selectedColor: "", selectedColors: [] as string[], colorOther: "", filament: "", expectedPickupDate: "", notes: "",
     pickupOption: "JGIC 201 Pickup (Laguna Campus)",
     driveLink: "",
     weight: 200,
@@ -55,6 +55,16 @@ export function ClientPortal({
   // Form validation regex patterns
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   const idRegex = /^\d{8}$/;
+  const driveLinkRegex = /^https?:\/\/(?:drive|docs|sheets|slides)\.google\.com\/[^\s]+$/;
+
+  const getMinPickupDate = () => {
+    const date = new Date();
+    date.setDate(date.getDate() + 2);
+    const yyyy = date.getFullYear();
+    const mm = String(date.getMonth() + 1).padStart(2, "0");
+    const dd = String(date.getDate()).padStart(2, "0");
+    return `${yyyy}-${mm}-${dd}`;
+  };
 
   const emailError = form.email.trim() && !emailRegex.test(form.email.trim())
     ? "Please enter a valid email address."
@@ -95,9 +105,11 @@ export function ClientPortal({
     : "";
 
   const needsDriveLink = form.service === "3D Printing With File";
-  const driveLinkError = needsDriveLink && !form.driveLink.trim()
-    ? "A Google Drive link is required for this service."
-    : "";
+  const driveLinkError = form.driveLink.trim() && !driveLinkRegex.test(form.driveLink.trim())
+    ? "Please enter a valid Google Drive link (e.g., https://drive.google.com/...)"
+    : (needsDriveLink && !form.driveLink.trim())
+      ? "A Google Drive link is required for this service."
+      : "";
 
   // Step validation check
   const isStepValid = () => {
@@ -121,15 +133,18 @@ export function ClientPortal({
     }
     if (step === 2) {
       if (!form.service) return false;
+      if (!form.purpose) return false;
       if (purposeOtherError) return false;
       return true;
     }
     if (step === 3) {
+      if (!form.color) return false;
+      if (!form.filament) return false;
       if (!form.isWeightNA && (form.weight <= 0 || form.weight > 1000)) return false;
       if (colorSelectionError) return false;
       if (colorOtherError) return false;
       if (driveLinkError) return false;
-      if (!form.expectedPickupDate) return false;
+      if (!form.expectedPickupDate || form.expectedPickupDate < getMinPickupDate()) return false;
       if (!form.pickupOption) return false;
       return true;
     }
@@ -523,14 +538,25 @@ export function ClientPortal({
                   <Select
                     label="Preferred Color"
                     value={form.color}
-                    onChange={v => setForm({ ...form, color: v, selectedColor: "", selectedColors: [], colorOther: "" })}
+                    onChange={v => {
+                      const nextFilament = v === "Multi-Color" ? "PLA" : form.filament;
+                      setForm({
+                        ...form,
+                        color: v,
+                        selectedColor: "",
+                        selectedColors: [],
+                        colorOther: "",
+                        filament: nextFilament
+                      });
+                    }}
                     options={["Single Color", "Multi-Color", "Others"]}
                   />
                   <Select
                     label="Filament / Material"
-                    value={form.filament}
+                    value={form.color === "Multi-Color" ? "PLA" : form.filament}
                     onChange={v => setForm({ ...form, filament: v })}
-                    options={["PLA", "ABS", "PETG", "TPU", "ASA", "Not Sure"]}
+                    options={form.color === "Multi-Color" ? ["PLA"] : ["PLA", "ABS", "PETG", "TPU", "ASA", "Not Sure"]}
+                    disabled={form.color === "Multi-Color"}
                   />
                 </div>
                 {form.color === "Single Color" && (
@@ -605,6 +631,7 @@ export function ClientPortal({
                     onChange={v => setForm({ ...form, expectedPickupDate: v })}
                     placeholder=""
                     required
+                    min={getMinPickupDate()}
                   />
                   <p className="text-xs text-amber-600/80 italic mt-0.5">
                     “Actual completion and delivery time vary depending on design complexity, print quantity, and project requirements.”
