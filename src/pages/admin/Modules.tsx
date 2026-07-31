@@ -4,6 +4,28 @@ import { PageHeader, Input } from "../../components/common";
 import { modulesService, type TrainingModule } from "../../services/modulesService";
 
 /**
+ * Strict validation for module resource links: both must use https:// and
+ * point to a recognized domain. Empty strings are allowed (the fields are
+ * optional) — only non-empty values are checked against the pattern.
+ */
+const YOUTUBE_URL_REGEX = /^https:\/\/(www\.)?(youtube\.com\/(watch\?v=|embed\/|shorts\/)[\w-]+(\S*)?|youtu\.be\/[\w-]+(\S*)?)$/i;
+const GDRIVE_URL_REGEX = /^https:\/\/(drive|docs)\.google\.com\/\S+$/i;
+
+function validateYoutubeLink(url: string): string {
+  if (!url.trim()) return "";
+  return YOUTUBE_URL_REGEX.test(url.trim())
+    ? ""
+    : "Must be a valid https:// YouTube link (e.g. https://youtube.com/watch?v=... or https://youtu.be/...).";
+}
+
+function validateGDriveLink(url: string): string {
+  if (!url.trim()) return "";
+  return GDRIVE_URL_REGEX.test(url.trim())
+    ? ""
+    : "Must be a valid https:// Google Drive link (e.g. https://drive.google.com/...).";
+}
+
+/**
  * Modules Management view for Admins.
  * Domain: Admin
  * @returns {JSX.Element}
@@ -19,6 +41,11 @@ export function AdminModules() {
   const [editForm, setEditForm] = useState({ title: "", desc: "", yt: "", gd: "" });
   const [savingEdit, setSavingEdit] = useState(false);
 
+  const ytError = validateYoutubeLink(form.yt);
+  const gdError = validateGDriveLink(form.gd);
+  const editYtError = validateYoutubeLink(editForm.yt);
+  const editGdError = validateGDriveLink(editForm.gd);
+
   const loadModules = async () => {
     setLoading(true);
     const data = await modulesService.fetchModules();
@@ -30,6 +57,7 @@ export function AdminModules() {
 
   async function addMod() {
     if (!form.title) return;
+    if (ytError || gdError) return;
     setSaving(true);
     const saved = await modulesService.addModule(form);
     setMods(m => [...m, saved]);
@@ -55,6 +83,7 @@ export function AdminModules() {
 
   async function saveEdit(id: string) {
     if (!editForm.title.trim()) return;
+    if (editYtError || editGdError) return;
     setSavingEdit(true);
     setMods(ms => ms.map(x => x.id === id ? { ...x, ...editForm } : x));
     await modulesService.updateModule(id, editForm);
@@ -77,12 +106,12 @@ export function AdminModules() {
           </div>
 
           <div className="grid grid-cols-2 gap-3">
-            <Input label="YouTube Link" value={form.yt} onChange={v => setForm(f => ({ ...f, yt: v }))} placeholder="https://youtube.com/..." />
-            <Input label="GDrive Link" value={form.gd} onChange={v => setForm(f => ({ ...f, gd: v }))} placeholder="https://drive.google.com/..." />
+            <Input label="YouTube Link" value={form.yt} onChange={v => setForm(f => ({ ...f, yt: v }))} placeholder="https://youtube.com/watch?v=..." error={ytError} />
+            <Input label="GDrive Link" value={form.gd} onChange={v => setForm(f => ({ ...f, gd: v }))} placeholder="https://drive.google.com/..." error={gdError} />
           </div>
 
           <div className="flex gap-2">
-            <button onClick={addMod} disabled={saving || !form.title} className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white text-sm font-medium px-4 py-2 rounded-lg transition">
+            <button onClick={addMod} disabled={saving || !form.title || !!ytError || !!gdError} className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white text-sm font-medium px-4 py-2 rounded-lg transition">
               {saving ? "Saving..." : "Save"}
             </button>
             <button onClick={() => setAdding(false)} className="bg-muted text-muted-foreground hover:bg-muted/80 text-sm font-medium px-4 py-2 rounded-lg transition">Cancel</button>
@@ -129,24 +158,30 @@ export function AdminModules() {
                             className="w-full text-xs border border-border bg-background text-foreground rounded px-2 py-1.5 outline-none focus:ring-1 focus:ring-emerald-400 resize-none"
                           />
                           <div className="grid grid-cols-2 gap-2">
-                            <input
-                              value={editForm.yt}
-                              onChange={e => setEditForm(f => ({ ...f, yt: e.target.value }))}
-                              placeholder="YouTube link"
-                              className="w-full text-xs border border-border bg-background text-foreground rounded px-2 py-1.5 outline-none focus:ring-1 focus:ring-emerald-400"
-                            />
-                            <input
-                              value={editForm.gd}
-                              onChange={e => setEditForm(f => ({ ...f, gd: e.target.value }))}
-                              placeholder="GDrive link"
-                              className="w-full text-xs border border-border bg-background text-foreground rounded px-2 py-1.5 outline-none focus:ring-1 focus:ring-emerald-400"
-                            />
+                            <div className="flex flex-col gap-1">
+                              <input
+                                value={editForm.yt}
+                                onChange={e => setEditForm(f => ({ ...f, yt: e.target.value }))}
+                                placeholder="YouTube link (https://...)"
+                                className={`w-full text-xs border bg-background text-foreground rounded px-2 py-1.5 outline-none focus:ring-1 ${editYtError ? "border-red-500 focus:ring-red-400" : "border-border focus:ring-emerald-400"}`}
+                              />
+                              {editYtError && <span className="text-[11px] text-red-500">{editYtError}</span>}
+                            </div>
+                            <div className="flex flex-col gap-1">
+                              <input
+                                value={editForm.gd}
+                                onChange={e => setEditForm(f => ({ ...f, gd: e.target.value }))}
+                                placeholder="GDrive link (https://...)"
+                                className={`w-full text-xs border bg-background text-foreground rounded px-2 py-1.5 outline-none focus:ring-1 ${editGdError ? "border-red-500 focus:ring-red-400" : "border-border focus:ring-emerald-400"}`}
+                              />
+                              {editGdError && <span className="text-[11px] text-red-500">{editGdError}</span>}
+                            </div>
                           </div>
                         </div>
                       </td>
                       <td className="px-4 py-3 align-top">
                         <div className="flex gap-1">
-                          <button onClick={() => saveEdit(m.id)} disabled={savingEdit} className="p-1.5 bg-emerald-500/20 text-emerald-500 rounded hover:bg-emerald-500/30 transition disabled:opacity-40" title="Save">
+                          <button onClick={() => saveEdit(m.id)} disabled={savingEdit || !!editYtError || !!editGdError} className="p-1.5 bg-emerald-500/20 text-emerald-500 rounded hover:bg-emerald-500/30 transition disabled:opacity-40" title="Save">
                             <Check className="w-3.5 h-3.5" />
                           </button>
                           <button onClick={cancelEdit} className="p-1.5 bg-red-500/20 text-red-500 rounded hover:bg-red-500/30 transition" title="Cancel">
