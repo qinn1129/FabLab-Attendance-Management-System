@@ -61,6 +61,7 @@ export default function App() {
             onBack={() => setFlow("home")} 
             commissions={commissions} 
             onUpdate={handleUpdateCommission} 
+            onRefresh={fetchCommissionsData}
             isLoading={loading} 
           />
         )}

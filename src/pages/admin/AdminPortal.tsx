@@ -25,11 +25,14 @@ export function AdminPortal({
   onBack,
   commissions,
   onUpdate,
+  onRefresh,
   isLoading
 }: {
   onBack: () => void;
   commissions: Commission[];
   onUpdate: (id: string, updates: Partial<Commission>) => Promise<void>;
+  /** Optional — re-fetches commissions from Sheets without a full page reload. Threaded down to Commission Approval and Commission Tracker for their Refresh buttons. */
+  onRefresh?: () => Promise<void> | void;
   isLoading: boolean;
 }) {
   const [loggedIn, setLoggedIn] = useState(false);
@@ -139,8 +142,8 @@ export function AdminPortal({
   const renderScreen = () => {
     switch (screen) {
       case "dashboard": return <AdminDashboard commissions={commissions} />;
-      case "approvals": return <AdminApprovals commissions={commissions} onUpdate={onUpdate} />;
-      case "tracker": return <AdminTracker commissions={commissions} onUpdate={onUpdate} />;
+      case "approvals": return <AdminApprovals commissions={commissions} onUpdate={onUpdate} onRefresh={onRefresh} />;
+      case "tracker": return <AdminTracker commissions={commissions} onUpdate={onUpdate} onRefresh={onRefresh} />;
       case "tasks": return <AdminTasks commissions={commissions} />;
       case "testimonials": return <AdminTestimonials />;
       case "announcements": return <AdminAnnouncements />;

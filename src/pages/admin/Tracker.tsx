@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useEffect } from "react";
-import { Check, Edit2, X } from "lucide-react";
+import { Check, Edit2, X, Info, RefreshCw } from "lucide-react";
 import { PageHeader, StatusBadge } from "../../components/common";
 import { accountsService, type Account } from "../../services/accountsService";
 import { type Commission } from "../../services/sheetsService";
@@ -12,16 +12,22 @@ import { formatDateOnly } from "../../lib/dateFormat";
  * Renders the full Commission Tracker for Admins to view and assign.
  * Reassigning the RM on a commission emails both the previous RM (no
  * longer assigned) and the newly assigned RM, and keeps the linked
- * Task Assignment entry (if any) pointed at the correct RM.
+ * Task Assignment entry (if any) pointed at the correct RM. A "More Info"
+ * action opens a modal with the full client/commission details that don't
+ * fit in the table (contact number, client-type-specific fields, purpose,
+ * color, filament, pickup option, weight, and notes).
  * Domain: Admin
  * @returns {JSX.Element}
  */
 export function AdminTracker({ 
   commissions, 
-  onUpdate 
+  onUpdate,
+  onRefresh
 }: { 
   commissions: Commission[]; 
   onUpdate: (id: string, updates: Partial<Commission>) => Promise<void>; 
+  /** Optional — re-fetches commissions from the backend without a full page reload. */
+  onRefresh?: () => Promise<void> | void;
 }) {
   const [editId, setEditId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<{
@@ -32,6 +38,8 @@ export function AdminTracker({
     status: string;
   } | null>(null);
   const [reassigning, setReassigning] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [moreInfoItem, setMoreInfoItem] = useState<Commission | null>(null);
 
   const [makers, setMakers] = useState<Account[]>([]);
 
@@ -42,6 +50,16 @@ export function AdminTracker({
   useEffect(() => {
     accountsService.fetchResidentMakers().then(setMakers);
   }, []);
+
+  async function handleRefresh() {
+    if (!onRefresh || refreshing) return;
+    setRefreshing(true);
+    try {
+      await onRefresh();
+    } finally {
+      setRefreshing(false);
+    }
+  }
 
   const uniqueServices = Array.from(new Set(commissions.map(c => c.service).filter(Boolean)));
 
@@ -143,7 +161,22 @@ export function AdminTracker({
 
   return (
     <div className="p-6">
-      <PageHeader title="Commission Tracker" sub="Full view of all active and completed commissions" />
+      <PageHeader
+        title="Commission Tracker"
+        sub="Full view of all active and completed commissions"
+        action={
+          onRefresh ? (
+            <button
+              onClick={handleRefresh}
+              disabled={refreshing}
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-border bg-card text-foreground hover:bg-muted text-sm font-semibold transition disabled:opacity-50"
+            >
+              <RefreshCw className={cn("w-4 h-4", refreshing && "animate-spin")} />
+              Refresh
+            </button>
+          ) : undefined
+        }
+      />
       
       {/* Filters Bar */}
       <div className="bg-card rounded-xl border border-border p-4 mb-5 flex flex-wrap gap-4 items-center">
@@ -314,9 +347,14 @@ export function AdminTracker({
                           </button>
                         </>
                       ) : (
-                        <button onClick={() => startEdit(c)} className="p-1.5 bg-muted text-muted-foreground rounded hover:bg-muted/80 transition" title="Edit">
-                          <Edit2 className="w-3.5 h-3.5" />
-                        </button>
+                        <>
+                          <button onClick={() => setMoreInfoItem(c)} className="p-1.5 bg-muted text-muted-foreground rounded hover:bg-muted/80 transition" title="More Info">
+                            <Info className="w-3.5 h-3.5" />
+                          </button>
+                          <button onClick={() => startEdit(c)} className="p-1.5 bg-muted text-muted-foreground rounded hover:bg-muted/80 transition" title="Edit">
+                            <Edit2 className="w-3.5 h-3.5" />
+                          </button>
+                        </>
                       )}
                     </div>
                   </td>
@@ -326,6 +364,122 @@ export function AdminTracker({
           </tbody>
         </table>
       </div>
+
+      {/* More Info modal — shows fields that don't fit in the table */}
+      {moreInfoItem && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="w-full max-w-lg rounded-2xl bg-card border border-border p-6 shadow-2xl max-h-[85vh] overflow-y-auto">
+            <div className="flex items-start justify-between mb-4">
+              <div>
+                <h3 className="text-lg font-bold text-foreground">Commission {moreInfoItem.id} — Full Details</h3>
+                <p className="text-sm text-muted-foreground">{moreInfoItem.client}</p>
+              </div>
+              <button
+                onClick={() => setMoreInfoItem(null)}
+                className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition flex-shrink-0"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div>
+                <p className="text-xs text-muted-foreground mb-0.5">Contact Number</p>
+                <p className="font-medium text-foreground">{moreInfoItem.clientContactNumber || "—"}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground mb-0.5">Client Type</p>
+                <p className="font-medium text-foreground">{moreInfoItem.clientType || "—"}</p>
+              </div>
+
+              {moreInfoItem.clientType === "DLSU Student" && (
+                <>
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-0.5">ID Number</p>
+                    <p className="font-medium text-foreground">{moreInfoItem.idNumber || "—"}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-0.5">Program / College</p>
+                    <p className="font-medium text-foreground">
+                      {moreInfoItem.program || "—"}{moreInfoItem.college ? ` (${moreInfoItem.college})` : ""}
+                    </p>
+                  </div>
+                </>
+              )}
+
+              {moreInfoItem.clientType === "Non-DLSU Student" && (
+                <>
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-0.5">Program</p>
+                    <p className="font-medium text-foreground">{moreInfoItem.program || "—"}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-0.5">University</p>
+                    <p className="font-medium text-foreground">{moreInfoItem.affiliation || "—"}</p>
+                  </div>
+                </>
+              )}
+
+              {moreInfoItem.clientType === "Faculty" && (
+                <div>
+                  <p className="text-xs text-muted-foreground mb-0.5">Department</p>
+                  <p className="font-medium text-foreground">{moreInfoItem.department || "—"}</p>
+                </div>
+              )}
+
+              {moreInfoItem.clientType === "Outsider" && (
+                <div>
+                  <p className="text-xs text-muted-foreground mb-0.5">Affiliation</p>
+                  <p className="font-medium text-foreground">{moreInfoItem.affiliation || "—"}</p>
+                </div>
+              )}
+
+              <div>
+                <p className="text-xs text-muted-foreground mb-0.5">Purpose of Commission</p>
+                <p className="font-medium text-foreground">
+                  {moreInfoItem.purpose === "Others" ? (moreInfoItem.purposeOther || "—") : (moreInfoItem.purpose || "—")}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground mb-0.5">Preferred Color</p>
+                <p className="font-medium text-foreground">{moreInfoItem.color || "—"}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground mb-0.5">Filament / Material</p>
+                <p className="font-medium text-foreground">{moreInfoItem.filament || "—"}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground mb-0.5">Pickup Option</p>
+                <p className="font-medium text-foreground">{moreInfoItem.pickupOption || "—"}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground mb-0.5">Estimated Weight</p>
+                <p className="font-medium text-foreground">{moreInfoItem.weight ? `${moreInfoItem.weight} g` : "N/A"}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground mb-0.5">Expected Pickup Date</p>
+                <p className="font-medium text-foreground">
+                  {moreInfoItem.expectedPickupDate ? formatDateOnly(moreInfoItem.expectedPickupDate) : "—"}
+                </p>
+              </div>
+
+              <div className="col-span-2">
+                <p className="text-xs text-muted-foreground mb-0.5">Additional Notes</p>
+                <p className="font-medium text-foreground whitespace-pre-wrap">{moreInfoItem.notes || "—"}</p>
+              </div>
+            </div>
+
+            <div className="flex justify-end mt-5">
+              <button
+                onClick={() => setMoreInfoItem(null)}
+                className="px-4 py-2 rounded-lg bg-muted text-muted-foreground hover:bg-muted/80 text-sm font-medium transition"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

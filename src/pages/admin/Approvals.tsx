@@ -1,11 +1,12 @@
 import React, { useState, useRef, useEffect } from "react";
-import { Check, X, User, CheckCircle, Sparkles, Sprout, UserCog } from "lucide-react";
+import { Check, X, User, CheckCircle, Sparkles, Sprout, UserCog, Info, RefreshCw } from "lucide-react";
 import { PageHeader, useDialog } from "../../components/common";
 import { type Commission } from "../../services/sheetsService";
 import { sendCommissionConfirmationEmail, sendCommissionRejectionEmail, sendRMAssignmentEmail } from "../../services/emailService";
 import { accountsService, type Account } from "../../services/accountsService";
 import { formatDateTime, formatDateOnly } from "../../lib/dateFormat";
 import { tasksService, pickLeastBusyMakerId } from "../../services/tasksService";
+import { cn } from "../../lib/utils";
 
 /**
  * Renders the Commission Approvals view for Admins. Approving opens a modal
@@ -13,15 +14,21 @@ import { tasksService, pickLeastBusyMakerId } from "../../services/tasksService"
  * pick a specific Resident Maker. Rejecting opens a reason prompt — the
  * commission is ONLY marked Rejected if the admin actually confirms the
  * prompt; cancelling it (even with an empty reason cancel) leaves the
- * commission untouched.
+ * commission untouched. A "More Info" button on each row opens a modal with
+ * the full client/commission details that don't fit in the summary row
+ * (contact number, client-type-specific fields, purpose, color, filament,
+ * pickup option, weight, and notes).
  * Domain: Admin
  */
 export function AdminApprovals({
   commissions,
-  onUpdate
+  onUpdate,
+  onRefresh
 }: {
   commissions: Commission[];
   onUpdate: (id: string, updates: Partial<Commission>) => Promise<void>;
+  /** Optional — re-fetches commissions from the backend without a full page reload. */
+  onRefresh?: () => Promise<void> | void;
 }) {
   const { prompt } = useDialog();
   const [assignedNotice, setAssignedNotice] = useState<string | null>(null);
@@ -31,6 +38,8 @@ export function AdminApprovals({
     timeLeft: number;
   } | null>(null);
   const intervalRef = useRef<any>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [moreInfoItem, setMoreInfoItem] = useState<Commission | null>(null);
 
   const items = commissions.filter(c => c.status === "Awaiting Approval" && c.id !== undoReject?.id);
 
@@ -39,6 +48,16 @@ export function AdminApprovals({
   const [selectedMakerId, setSelectedMakerId] = useState<string>("");
   const [confirming, setConfirming] = useState(false);
   const [rejectingId, setRejectingId] = useState<string | null>(null);
+
+  async function handleRefresh() {
+    if (!onRefresh || refreshing) return;
+    setRefreshing(true);
+    try {
+      await onRefresh();
+    } finally {
+      setRefreshing(false);
+    }
+  }
 
   async function openApproveModal(id: string) {
     const commission = commissions.find(c => c.id === id);
@@ -192,7 +211,22 @@ export function AdminApprovals({
 
   return (
     <div className="p-6">
-      <PageHeader title="Commission Approval" sub={`${items.length} requests awaiting review`} />
+      <PageHeader
+        title="Commission Approval"
+        sub={`${items.length} requests awaiting review`}
+        action={
+          onRefresh ? (
+            <button
+              onClick={handleRefresh}
+              disabled={refreshing}
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-border bg-card text-foreground hover:bg-muted text-sm font-semibold transition disabled:opacity-50"
+            >
+              <RefreshCw className={cn("w-4 h-4", refreshing && "animate-spin")} />
+              Refresh
+            </button>
+          ) : undefined
+        }
+      />
       {undoReject && (
         <div className="mb-4 p-3 bg-red-500/10 border border-red-500/30 rounded-xl text-red-700 dark:text-red-300 text-xs font-medium flex items-center justify-between animate-in slide-in-from-top-2 duration-300">
           <div className="flex items-center gap-2">
@@ -285,6 +319,13 @@ export function AdminApprovals({
 
               {/*Actions*/}
               <div className="flex gap-2 flex-shrink-0">
+                <button
+                  onClick={() => setMoreInfoItem(item)}
+                  className="px-3 py-1.5 bg-muted hover:bg-muted/80 text-muted-foreground text-xs font-semibold rounded-lg border border-border transition flex items-center gap-1"
+                >
+                  <Info className="w-3.5 h-3.5" /> More Info
+                </button>
+
                 <button onClick={() => openApproveModal(item.id)} className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg transition flex items-center gap-1">
                   <Check className="w-3.5 h-3.5" /> Approve
                 </button>
@@ -299,6 +340,122 @@ export function AdminApprovals({
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* More Info modal — shows fields that don't fit in the summary row */}
+      {moreInfoItem && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="w-full max-w-lg rounded-2xl bg-card border border-border p-6 shadow-2xl max-h-[85vh] overflow-y-auto">
+            <div className="flex items-start justify-between mb-4">
+              <div>
+                <h3 className="text-lg font-bold text-foreground">Commission {moreInfoItem.id} — Full Details</h3>
+                <p className="text-sm text-muted-foreground">{moreInfoItem.client}</p>
+              </div>
+              <button
+                onClick={() => setMoreInfoItem(null)}
+                className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition flex-shrink-0"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div>
+                <p className="text-xs text-muted-foreground mb-0.5">Contact Number</p>
+                <p className="font-medium text-foreground">{moreInfoItem.clientContactNumber || "—"}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground mb-0.5">Client Type</p>
+                <p className="font-medium text-foreground">{moreInfoItem.clientType || "—"}</p>
+              </div>
+
+              {moreInfoItem.clientType === "DLSU Student" && (
+                <>
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-0.5">ID Number</p>
+                    <p className="font-medium text-foreground">{moreInfoItem.idNumber || "—"}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-0.5">Program / College</p>
+                    <p className="font-medium text-foreground">
+                      {moreInfoItem.program || "—"}{moreInfoItem.college ? ` (${moreInfoItem.college})` : ""}
+                    </p>
+                  </div>
+                </>
+              )}
+
+              {moreInfoItem.clientType === "Non-DLSU Student" && (
+                <>
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-0.5">Program</p>
+                    <p className="font-medium text-foreground">{moreInfoItem.program || "—"}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-0.5">University</p>
+                    <p className="font-medium text-foreground">{moreInfoItem.affiliation || "—"}</p>
+                  </div>
+                </>
+              )}
+
+              {moreInfoItem.clientType === "Faculty" && (
+                <div>
+                  <p className="text-xs text-muted-foreground mb-0.5">Department</p>
+                  <p className="font-medium text-foreground">{moreInfoItem.department || "—"}</p>
+                </div>
+              )}
+
+              {moreInfoItem.clientType === "Outsider" && (
+                <div>
+                  <p className="text-xs text-muted-foreground mb-0.5">Affiliation</p>
+                  <p className="font-medium text-foreground">{moreInfoItem.affiliation || "—"}</p>
+                </div>
+              )}
+
+              <div>
+                <p className="text-xs text-muted-foreground mb-0.5">Purpose of Commission</p>
+                <p className="font-medium text-foreground">
+                  {moreInfoItem.purpose === "Others" ? (moreInfoItem.purposeOther || "—") : (moreInfoItem.purpose || "—")}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground mb-0.5">Preferred Color</p>
+                <p className="font-medium text-foreground">{moreInfoItem.color || "—"}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground mb-0.5">Filament / Material</p>
+                <p className="font-medium text-foreground">{moreInfoItem.filament || "—"}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground mb-0.5">Pickup Option</p>
+                <p className="font-medium text-foreground">{moreInfoItem.pickupOption || "—"}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground mb-0.5">Estimated Weight</p>
+                <p className="font-medium text-foreground">{moreInfoItem.weight ? `${moreInfoItem.weight} g` : "N/A"}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground mb-0.5">Expected Pickup Date</p>
+                <p className="font-medium text-foreground">
+                  {moreInfoItem.expectedPickupDate ? formatDateOnly(moreInfoItem.expectedPickupDate) : "—"}
+                </p>
+              </div>
+
+              <div className="col-span-2">
+                <p className="text-xs text-muted-foreground mb-0.5">Additional Notes</p>
+                <p className="font-medium text-foreground whitespace-pre-wrap">{moreInfoItem.notes || "—"}</p>
+              </div>
+            </div>
+
+            <div className="flex justify-end mt-5">
+              <button
+                onClick={() => setMoreInfoItem(null)}
+                className="px-4 py-2 rounded-lg bg-muted text-muted-foreground hover:bg-muted/80 text-sm font-medium transition"
+              >
+                Close
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
