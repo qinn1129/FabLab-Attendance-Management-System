@@ -1,8 +1,10 @@
 export interface Workshop {
   id: string;
   title: string;
-  date: string; // free-form display label, e.g. "Jun 28"
-  tag: string; // e.g. "Free • Beginner"
+  /** Strict ISO "YYYY-MM-DD" for new entries (set via a date picker in Admin). Older records may still hold a free-form label like "Jun 28" — see formatFlexibleDate in lib/dateFormat.ts for display. */
+  date: string;
+  /** Comma-separated tag list under the hood (e.g. "Free,Beginner") so the existing "tag" sheet column doesn't need a schema change. Use parseTagsString/stringifyTags to work with it as string[]. */
+  tag: string;
   image: string;
   link?: string; // external booking link (e.g. Luma)
   order?: number;
@@ -15,6 +17,25 @@ const getScriptUrl = (): string | null => {
 };
 
 const getSecret = () => import.meta.env.VITE_WEBAPP_SECRET || "";
+
+/**
+ * Splits a stored tag string into a clean array of individual tags.
+ * Accepts commas (the canonical separator going forward) as well as the
+ * old "•" bullet separator used by legacy free-text tag entries, so
+ * existing workshops still render as separate chips in the new UI.
+ */
+export function parseTagsString(tag: string | undefined | null): string[] {
+  if (!tag) return [];
+  return tag
+    .split(/[,•|]/)
+    .map(t => t.trim())
+    .filter(Boolean);
+}
+
+/** Joins a tag array back into the comma-separated string stored in the "tag" sheet column. */
+export function stringifyTags(tags: string[]): string {
+  return tags.map(t => t.trim()).filter(Boolean).join(", ");
+}
 
 export const workshopsService = {
   async fetchWorkshops(): Promise<Workshop[]> {

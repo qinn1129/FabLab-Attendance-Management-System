@@ -36,6 +36,19 @@ export function formatDateOnly(input?: string | Date | null): string {
   return `${month} ${day}, ${year}`;
 }
 
+export function formatShortDate(input?: string | Date | null): string {
+  return formatDateOnly(input);
+}
+
+
+export function formatFlexibleDate(input?: string | null): string {
+  if (!input || !input.trim()) return "—";
+  if (/^\d{4}-\d{2}-\d{2}$/.test(input.trim())) {
+    return formatDateOnly(input.trim());
+  }
+  return input.trim();
+}
+
 export function combineDateAndTime(day: Date, hours: number, minutes: number): Date {
   return new Date(day.getFullYear(), day.getMonth(), day.getDate(), hours, minutes);
 }

@@ -8,3 +8,4 @@ export * from "./ChatWidget";
 export * from "./ChangePasswordForm";
 export * from "./FridayScheduleNotification";
 export * from "./DialogProvider";
+export * from "./TagInput";
