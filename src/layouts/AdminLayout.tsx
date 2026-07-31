@@ -7,30 +7,31 @@ import { cn } from "../lib/utils";
 
 /**
  * Navigation structure for the Admin Portal.
+ * The `category` field controls which section header each item is
+ * grouped under in the sidebar. Order matters: sections render in the
+ * order their first item appears in this array.
  */
 export const ADMIN_NAV = [
 // Overview
   { id: "dashboard", label: "Dashboard", icon: BarChart2, category: "Overview" },
-  
-  // Operations
-  { id: "machines", label: "Machine Status", icon: CpuIcon, category: "Operations" },
-  { id: "approvals", label: "Commission Approval", icon: CheckCircle, category: "Operations" },
-  { id: "tracker", label: "Commission Tracker", icon: Package, category: "Operations" },
-  
+
+  // Commissions
+  { id: "machines", label: "Machine Status", icon: CpuIcon, category: "Commissions" },
+  { id: "approvals", label: "Commission Approval", icon: CheckCircle, category: "Commissions" },
+  { id: "tracker", label: "Commission Tracker", icon: Package, category: "Commissions" },
+
   // Client Page
   { id: "services", label: "Service Offerings", icon: Boxes, category: "Client Page" },
   { id: "workshops", label: "Workshops", icon: Presentation, category: "Client Page" },
   { id: "testimonials", label: "Testimonials", icon: MessageSquareQuote, category: "Client Page" },
-  
-  // Resident Makers
-  { id: "rm-accounts", label: "RM Accounts", icon: Users, category: "Resident Makers" },
-  { id: "tasks", label: "Commission Assignment", icon: Layers, category: "Resident Makers" },
-  { id: "announcements", label: "Announcements", icon: Bell, category: "Resident Makers" },
-  { id: "modules", label: "Modules", icon: Book, category: "Resident Makers" },
-  { id: "faq", label: "FAQ Management", icon: HelpCircle, category: "Resident Makers" },
-  
-  // Settings
-  { id: "profile", label: "Profile", icon: User, category: "Settings" },
+
+  // Resident Makers and Profile
+  { id: "rm-accounts", label: "RM Accounts", icon: Users, category: "Resident Makers and Profile" },
+  { id: "tasks", label: "Commission Assignment", icon: Layers, category: "Resident Makers and Profile" },
+  { id: "announcements", label: "Announcements", icon: Bell, category: "Resident Makers and Profile" },
+  { id: "modules", label: "Modules", icon: Book, category: "Resident Makers and Profile" },
+  { id: "faq", label: "FAQ Management", icon: HelpCircle, category: "Resident Makers and Profile" },
+  { id: "profile", label: "Profile", icon: User, category: "Resident Makers and Profile" },
 ];
 
 /**
@@ -46,11 +47,27 @@ interface AdminLayoutProps {
 
 /**
  * Layout wrapper for the Admin portal. Includes the collapsible sidebar and chat widget.
+ * The sidebar nav is segmented into labelled category groups (Overview,
+ * Commissions, Client Page, Resident Makers and Profile) so related pages
+ * are visually clustered together, matching the requested nav mockup.
  * @param {AdminLayoutProps} props
  * @returns {JSX.Element}
  */
 export function AdminLayout({ children, currentScreen, setScreen, onLogout, adminName }: AdminLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
+
+  // Group nav items by category, preserving the order categories first
+  // appear in ADMIN_NAV so the sidebar renders sections top-to-bottom
+  // exactly as declared above.
+  const categoryOrder: string[] = [];
+  const groupedNav: Record<string, typeof ADMIN_NAV> = {};
+  ADMIN_NAV.forEach(item => {
+    if (!groupedNav[item.category]) {
+      groupedNav[item.category] = [];
+      categoryOrder.push(item.category);
+    }
+    groupedNav[item.category].push(item);
+  });
 
   return (
     <div className="h-screen flex overflow-hidden bg-background">
@@ -66,25 +83,38 @@ export function AdminLayout({ children, currentScreen, setScreen, onLogout, admi
             <ChevronRight className={`w-4 h-4 transition-transform ${sidebarOpen ? "rotate-180" : ""}`} />
           </button>
         </div>
-        <nav className="flex-1 py-3 space-y-0.5 overflow-y-auto">
-          {ADMIN_NAV.map(n => {
-            const Icon = n.icon;
-            const active = currentScreen === n.id;
-            return (
-              <button
-                key={n.id}
-                onClick={() => setScreen(n.id)}
-                title={!sidebarOpen ? n.label : undefined}
-                className={cn(
-                  "w-full flex items-center gap-2.5 px-3 py-2 text-sm transition-all rounded-none",
-                  active ? "bg-sidebar-accent/50 text-sidebar-primary border-r-2 border-sidebar-primary" : "text-sidebar-foreground/50 hover:text-sidebar-foreground hover:bg-sidebar-accent/30"
-                )}
-              >
-                <Icon className="w-4 h-4 flex-shrink-0" />
-                {sidebarOpen && <span className="truncate">{n.label}</span>}
-              </button>
-            );
-          })}
+        <nav className="flex-1 py-3 overflow-y-auto">
+          {categoryOrder.map((category, catIdx) => (
+            <div key={category} className={cn(catIdx > 0 && "mt-4")}>
+              {sidebarOpen ? (
+                <p className="px-3 pb-1.5 text-[10px] font-bold uppercase tracking-wider text-sidebar-foreground/40 truncate">
+                  {category}
+                </p>
+              ) : (
+                catIdx > 0 && <div className="mx-3 mb-1.5 border-t border-sidebar-border/60" />
+              )}
+              <div className="space-y-0.5">
+                {groupedNav[category].map(n => {
+                  const Icon = n.icon;
+                  const active = currentScreen === n.id;
+                  return (
+                    <button
+                      key={n.id}
+                      onClick={() => setScreen(n.id)}
+                      title={!sidebarOpen ? n.label : undefined}
+                      className={cn(
+                        "w-full flex items-center gap-2.5 px-3 py-2 text-sm transition-all rounded-none",
+                        active ? "bg-sidebar-accent/50 text-sidebar-primary border-r-2 border-sidebar-primary" : "text-sidebar-foreground/50 hover:text-sidebar-foreground hover:bg-sidebar-accent/30"
+                      )}
+                    >
+                      <Icon className="w-4 h-4 flex-shrink-0" />
+                      {sidebarOpen && <span className="truncate">{n.label}</span>}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
         </nav>
         <div className="border-t border-sidebar-border p-3 flex flex-col gap-3">
           <ThemeToggle isSidebarOpen={sidebarOpen} />
