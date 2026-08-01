@@ -12,6 +12,7 @@ import { accountsService, type Account } from "../../services/accountsService";
 import { rememberMe } from "../../lib/rememberMe";
 import { type Commission } from "../../services/sheetsService";
 import { ALL_DLSU_PROGRAMS } from "../../constants/DLSUPrograms";
+import { YEAR_LEVEL_OPTIONS } from "../../constants/yearLevels";
 
 export function MakerPortal({
   onBack,
@@ -177,7 +178,7 @@ export function MakerPortal({
                   <Input label="Email Address" type="email" value={regForm.email} onChange={v => setRegForm(f => ({ ...f, email: v }))} placeholder="name@dlsu.edu.ph" required />
                   <div className="grid grid-cols-2 gap-3">
                     <Select label="Program" value={regForm.program} onChange={v => setRegForm(f => ({ ...f, program: v }))} options={ALL_DLSU_PROGRAMS} />
-                    <Input label="Year Level" value={regForm.year} onChange={v => setRegForm(f => ({ ...f, year: v }))} placeholder="e.g. 3rd Year" />
+                    <Select label="Year Level" value={regForm.year} onChange={v => setRegForm(f => ({ ...f, year: v }))} options={YEAR_LEVEL_OPTIONS} />
                   </div>
                   <Input label="Password" type="password" value={regForm.password} onChange={v => setRegForm(f => ({ ...f, password: v }))} placeholder="At least 8 characters" required />
                   <Input label="Confirm Password" type="password" value={regForm.confirmPassword} onChange={v => setRegForm(f => ({ ...f, confirmPassword: v }))} placeholder="••••••••" required />

@@ -1,3 +1,5 @@
+import { parseSheetBoolean } from "../lib/utils";
+
 export interface Workshop {
   id: string;
   title: string;
@@ -9,6 +11,8 @@ export interface Workshop {
   link?: string; // external booking link (e.g. Luma)
   order?: number;
   createdAt?: string;
+  /** Whether this workshop should appear on the client landing page. Admin-curated — see CLIENT_PAGE_LIMIT in pages/admin/Workshops.tsx. Missing/blank cells (rows saved before this field existed) default to visible so nothing disappears unexpectedly. */
+  visible?: boolean;
 }
 
 const getScriptUrl = (): string | null => {
@@ -50,7 +54,7 @@ export const workshopsService = {
       const data = await response.json();
       if (data.error) throw new Error(data.error);
       return (data as Workshop[])
-        .map(w => ({ ...w, order: Number(w.order) || 0 }))
+        .map(w => ({ ...w, order: Number(w.order) || 0, visible: parseSheetBoolean(w.visible, true) }))
         .sort((a, b) => (a.order || 0) - (b.order || 0) || (a.createdAt || "").localeCompare(b.createdAt || ""));
     } catch (error) {
       console.error("[workshopsService] Failed to fetch workshops.", error);
@@ -58,9 +62,10 @@ export const workshopsService = {
     }
   },
 
-  async addWorkshop(workshop: { title: string; date: string; tag: string; image: string; link?: string; order?: number }): Promise<Workshop> {
+  async addWorkshop(workshop: { title: string; date: string; tag: string; image: string; link?: string; order?: number; visible?: boolean }): Promise<Workshop> {
     const newWorkshop: Workshop = {
       id: `WKS-${Date.now()}`,
+      visible: true,
       ...workshop,
       createdAt: new Date().toISOString(),
     };

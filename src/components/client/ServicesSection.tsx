@@ -4,8 +4,12 @@ import { getServiceIcon } from "../../constants/serviceIcons";
 
 /**
  * Services overview section for the Client landing page.
- * Now backed by the "services" sheet (managed via Admin > Service
- * Offerings) instead of a hardcoded array.
+ * Backed by the "services" sheet (managed via Admin > Service Offerings).
+ * Only services the admin has explicitly marked "Show on Client Page" are
+ * displayed here (see the `visible` flag) — the `.slice(0, 4)` below is
+ * kept as a defensive cap so the layout can't ever break even if more than
+ * 4 somehow end up marked visible, but Admin already enforces that limit
+ * at the source.
  * Domain: Client
  * @returns {JSX.Element}
  */
@@ -15,7 +19,8 @@ export function ServicesSection() {
 
   useEffect(() => {
     servicesService.fetchServices().then(data => {
-      setServices(data.slice(0, 4));
+      const visibleOnly = data.filter(s => s.visible !== false);
+      setServices(visibleOnly.slice(0, 4));
       setLoading(false);
     });
   }, []);

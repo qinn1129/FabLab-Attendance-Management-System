@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { PageHeader, Input, Select, ChangePasswordForm } from "../../components/common";
 import { accountsService, type Account } from "../../services/accountsService";
 import { ALL_DLSU_PROGRAMS } from "../../constants/DLSUPrograms";
+import { YEAR_LEVEL_OPTIONS } from "../../constants/yearLevels";
 import { Camera } from "lucide-react";
 import { resizeImageToDataUrl, MAX_PROFILE_PICTURE_BYTES } from "../../lib/imageUpload";
 
@@ -118,7 +119,7 @@ export function MakerProfile({
             <Input label="Last Name" value={form.lastName} onChange={v => setForm(f => ({ ...f, lastName: v }))} />
           </div>
           <Select label="Bachelor's Program" value={form.program} onChange={v => setForm(f => ({ ...f, program: v }))} options={ALL_DLSU_PROGRAMS} />
-          <Select label="Year Level" value={form.year} onChange={v => setForm(f => ({ ...f, year: v }))} options={["1st Year","2nd Year","3rd Year","4th Year","5th Year"]} />
+          <Select label="Year Level" value={form.year} onChange={v => setForm(f => ({ ...f, year: v }))} options={YEAR_LEVEL_OPTIONS} />
           <div className="flex flex-col gap-1">
             <label className="text-sm font-medium text-foreground">Description</label>
             <textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} rows={3} className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm text-foreground outline-none focus:ring-2 focus:ring-emerald-400 resize-none" />

@@ -10,6 +10,9 @@ import { formatFlexibleDate } from "../../lib/dateFormat";
  * Dates are rendered through formatFlexibleDate for a readable
  * "Month D, YYYY" label, and tags (stored as a comma-separated string)
  * are parsed and shown as a " • "-joined line, matching the original look.
+ * Only workshops the admin has explicitly marked "Show on Client Page"
+ * (the `visible` flag) are displayed — the `.slice(0, 3)` below is kept as
+ * a defensive cap, but Admin already enforces that limit at the source.
  * Domain: Client
  * @returns {JSX.Element}
  */
@@ -19,7 +22,8 @@ export function WorkshopsSection() {
 
   useEffect(() => {
     workshopsService.fetchWorkshops().then(data => {
-      setWorkshops(data.slice(0, 3));
+      const visibleOnly = data.filter(w => w.visible !== false);
+      setWorkshops(visibleOnly.slice(0, 3));
       setLoading(false);
     });
   }, []);

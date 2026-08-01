@@ -1,11 +1,14 @@
+import { parseSheetBoolean } from "../lib/utils";
+
 export interface ServiceOffering {
   id: string;
   title: string;
   desc: string;
-  icon: string; // key into ICON_MAP (see ServicesSection.tsx / AdminServices.tsx)
+  icon: string;
   image?: string;
   order?: number;
   createdAt?: string;
+  visible?: boolean;
 }
 
 const getScriptUrl = (): string | null => {
@@ -28,7 +31,7 @@ export const servicesService = {
       const data = await response.json();
       if (data.error) throw new Error(data.error);
       return (data as ServiceOffering[])
-        .map(s => ({ ...s, order: Number(s.order) || 0 }))
+        .map(s => ({ ...s, order: Number(s.order) || 0, visible: parseSheetBoolean(s.visible, true) }))
         .sort((a, b) => (a.order || 0) - (b.order || 0) || (a.createdAt || "").localeCompare(b.createdAt || ""));
     } catch (error) {
       console.error("[servicesService] Failed to fetch services.", error);
@@ -36,9 +39,10 @@ export const servicesService = {
     }
   },
 
-  async addService(service: { title: string; desc: string; icon: string; image?: string; order?: number }): Promise<ServiceOffering> {
+  async addService(service: { title: string; desc: string; icon: string; image?: string; order?: number; visible?: boolean }): Promise<ServiceOffering> {
     const newService: ServiceOffering = {
       id: `SVC-${Date.now()}`,
+      visible: true,
       ...service,
       createdAt: new Date().toISOString(),
     };

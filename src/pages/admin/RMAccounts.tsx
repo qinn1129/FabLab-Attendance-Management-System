@@ -4,6 +4,7 @@ import { cn } from "../../lib/utils";
 import { accountsService, type Account } from "../../services/accountsService";
 import { sheetsService, type WeeklySchedule, type AttendanceRequest } from "../../services/sheetsService";
 import { ALL_DLSU_PROGRAMS } from "../../constants/DLSUPrograms";
+import { YEAR_LEVEL_OPTIONS } from "../../constants/yearLevels";
 import { useDialog } from "../../components/common";
 import { Clock, AlertTriangle } from "lucide-react";
 import { formatDateOnly } from "../../lib/dateFormat";
@@ -192,7 +193,7 @@ export function AdminRMAccounts() {
                   <td className="px-4 py-3 font-semibold text-foreground whitespace-nowrap">{rm.firstName} {rm.lastName}</td>
                   <td className="px-4 py-3 text-muted-foreground text-xs">{rm.email}</td>
                   <td className="px-4 py-3 text-muted-foreground text-xs">{rm.program || "—"}</td>
-                  <td className="px-4 py-3 text-center font-mono">{rm.year || "—"}</td>
+                  <td className="px-4 py-3 text-left font-mono">{rm.year || "—"}</td>
                   <td className="px-4 py-3"><StatusBadge status={rm.status} /></td>
                   <td className="px-4 py-3">
                     {rm.status === "Pending" ? (
@@ -382,7 +383,7 @@ export function AdminRMAccounts() {
             <Input label="Temporary Password" type="password" value={regForm.password} onChange={v => setRegForm(f => ({ ...f, password: v }))} placeholder="••••••••" required />
             <div className="grid grid-cols-2 gap-3">
               <Select label="Program" value={regForm.program} onChange={v => setRegForm(f => ({ ...f, program: v }))} options={ALL_DLSU_PROGRAMS} />
-              <Input label="Year Level" value={regForm.year} onChange={v => setRegForm(f => ({ ...f, year: v }))} placeholder="e.g. 3rd Year" />
+              <Select label="Year Level" value={regForm.year} onChange={v => setRegForm(f => ({ ...f, year: v }))} options={YEAR_LEVEL_OPTIONS} />
             </div>
           </div>
           {regError && <p className="text-red-500 text-sm mt-3">{regError}</p>}
