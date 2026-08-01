@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useEffect } from "react";
-import { Check, Edit2, X, Info, RefreshCw } from "lucide-react";
+import { Check, Edit2, X, Info, RefreshCw, ExternalLink } from "lucide-react";
 import { PageHeader, StatusBadge } from "../../components/common";
 import { accountsService, type Account } from "../../services/accountsService";
 import { type Commission } from "../../services/sheetsService";
@@ -9,13 +9,30 @@ import { cn } from "../../lib/utils";
 import { formatDateOnly } from "../../lib/dateFormat";
 
 /**
+ * Resolves the best available Google Drive (or other file) link for a
+ * commission: prefers the dedicated `driveLink` field, falling back to
+ * `file` when it looks like an actual URL rather than a filename/placeholder
+ * (older rows sometimes stored the link directly in `file`). Returns null
+ * when there's nothing clickable to show.
+ */
+function resolveDriveLink(c: Commission): string | null {
+  const direct = (c.driveLink || "").trim();
+  if (direct) return direct;
+  const fromFile = (c.file || "").trim();
+  if (/^https?:\/\//i.test(fromFile)) return fromFile;
+  return null;
+}
+
+/**
  * Renders the full Commission Tracker for Admins to view and assign.
  * Reassigning the RM on a commission emails both the previous RM (no
  * longer assigned) and the newly assigned RM, and keeps the linked
- * Task Assignment entry (if any) pointed at the correct RM. A "More Info"
- * action opens a modal with the full client/commission details that don't
- * fit in the table (contact number, client-type-specific fields, purpose,
- * color, filament, pickup option, weight, and notes).
+ * Task Assignment entry (if any) pointed at the correct RM. Includes a
+ * dedicated, clickable Drive Link column (mirroring Commission Approval).
+ * A "More Info" action opens a modal with the full client/commission
+ * details that don't fit in the table (contact number, client-type-specific
+ * fields, purpose, color, filament, pickup option, weight, drive link, and
+ * notes).
  * Domain: Admin
  * @returns {JSX.Element}
  */
@@ -233,7 +250,7 @@ export function AdminTracker({
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-muted border-b border-border">
-              {["ID","Client","Service","Assigned RM","Deadline","Printer","Status","Problems Encountered","Actions"].map(h => (
+              {["ID","Client","Service","Drive Link","Assigned RM","Deadline","Printer","Status","Problems Encountered","Actions"].map(h => (
                 <th key={h} className="text-left px-3 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">{h}</th>
               ))}
             </tr>
@@ -242,12 +259,29 @@ export function AdminTracker({
           <tbody>
             {filteredCommissions.map((c, index) => {
               const isEditing = editId === c.id;
+              const driveLink = resolveDriveLink(c);
               return (
                 <tr key={`${c.id}-${index}`} className="border-b border-muted hover:bg-muted/50 transition">
                   <td className="px-3 py-2.5 font-mono text-xs text-muted-foreground">{c.id}</td>
                   <td className="px-3 py-2.5 font-medium text-foreground whitespace-nowrap">{c.client}</td>
                   <td className="px-3 py-2.5 text-muted-foreground whitespace-nowrap">{c.service}</td>
-                  
+
+                  {/*Drive Link*/}
+                  <td className="px-3 py-2.5 whitespace-nowrap">
+                    {driveLink ? (
+                      <a
+                        href={driveLink}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1 text-blue-500 hover:text-blue-600 underline font-medium text-xs"
+                      >
+                        Open <ExternalLink className="w-3 h-3" />
+                      </a>
+                    ) : (
+                      <span className="text-muted-foreground/30 text-xs">—</span>
+                    )}
+                  </td>
+
                   {/*Assigned RM*/}
                   <td className="px-3 py-2.5 min-w-[140px]">
                     {isEditing && editForm ? (
@@ -461,6 +495,21 @@ export function AdminTracker({
                 <p className="font-medium text-foreground">
                   {moreInfoItem.expectedPickupDate ? formatDateOnly(moreInfoItem.expectedPickupDate) : "—"}
                 </p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground mb-0.5">Drive Link</p>
+                {resolveDriveLink(moreInfoItem) ? (
+                  <a
+                    href={resolveDriveLink(moreInfoItem)!}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1 font-medium text-blue-500 hover:text-blue-600 underline"
+                  >
+                    Open Link <ExternalLink className="w-3 h-3" />
+                  </a>
+                ) : (
+                  <p className="font-medium text-foreground">—</p>
+                )}
               </div>
 
               <div className="col-span-2">

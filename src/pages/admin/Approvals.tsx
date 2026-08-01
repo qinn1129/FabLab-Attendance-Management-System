@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import { Check, X, User, CheckCircle, Sparkles, Sprout, UserCog, Info, RefreshCw } from "lucide-react";
+import { Check, X, User, CheckCircle, Sparkles, Sprout, UserCog, Info, RefreshCw, ExternalLink } from "lucide-react";
 import { PageHeader, useDialog } from "../../components/common";
 import { type Commission } from "../../services/sheetsService";
 import { sendCommissionConfirmationEmail, sendCommissionRejectionEmail, sendRMAssignmentEmail } from "../../services/emailService";
@@ -7,6 +7,21 @@ import { accountsService, type Account } from "../../services/accountsService";
 import { formatDateTime, formatDateOnly } from "../../lib/dateFormat";
 import { tasksService, pickLeastBusyMakerId } from "../../services/tasksService";
 import { cn } from "../../lib/utils";
+
+/**
+ * Resolves the best available Google Drive (or other file) link for a
+ * commission: prefers the dedicated `driveLink` field, falling back to
+ * `file` when it looks like an actual URL rather than a filename/placeholder
+ * (older rows sometimes stored the link directly in `file`). Returns null
+ * when there's nothing clickable to show.
+ */
+function resolveDriveLink(c: Commission): string | null {
+  const direct = (c.driveLink || "").trim();
+  if (direct) return direct;
+  const fromFile = (c.file || "").trim();
+  if (/^https?:\/\//i.test(fromFile)) return fromFile;
+  return null;
+}
 
 /**
  * Renders the Commission Approvals view for Admins. Approving opens a modal
@@ -285,17 +300,17 @@ export function AdminApprovals({
                   <p className="text-sm text-card-foreground truncate">{item.clientEmail}</p>
                 </div>
 
-                {/*Drive Link - Updated to check item.file for URLs*/}
+                {/*Drive Link*/}
                 <div>
                   <p className="text-xs text-muted-foreground">Drive Link</p>
-                  {item.driveLink || (item.file && item.file.startsWith("http")) ? (
+                  {resolveDriveLink(item) ? (
                     <a
-                      href={item.driveLink || item.file}
+                      href={resolveDriveLink(item)!}
                       target="_blank"
                       rel="noreferrer"
-                      className="text-sm text-blue-500 hover:text-blue-600 underline font-medium"
+                      className="inline-flex items-center gap-1 text-sm text-blue-500 hover:text-blue-600 underline font-medium"
                     >
-                      Link
+                      Open Link <ExternalLink className="w-3 h-3" />
                     </a>
                   ) : (
                     <p className="text-sm text-muted-foreground/50 italic">—</p>
@@ -439,6 +454,21 @@ export function AdminApprovals({
                 <p className="font-medium text-foreground">
                   {moreInfoItem.expectedPickupDate ? formatDateOnly(moreInfoItem.expectedPickupDate) : "—"}
                 </p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground mb-0.5">Drive Link</p>
+                {resolveDriveLink(moreInfoItem) ? (
+                  <a
+                    href={resolveDriveLink(moreInfoItem)!}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1 font-medium text-blue-500 hover:text-blue-600 underline"
+                  >
+                    Open Link <ExternalLink className="w-3 h-3" />
+                  </a>
+                ) : (
+                  <p className="font-medium text-foreground">—</p>
+                )}
               </div>
 
               <div className="col-span-2">
