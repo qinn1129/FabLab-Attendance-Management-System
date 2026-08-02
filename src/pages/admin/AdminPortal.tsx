@@ -6,6 +6,7 @@ import { AdminDashboard } from "./Dashboard";
 import { AdminApprovals } from "./Approvals";
 import { AdminTracker } from "./Tracker";
 import { AdminTasks } from "./Tasks";
+import { AdminCommissionAssignment } from "./CommissionAssignments";
 import { AdminAnnouncements } from "./Announcements";
 import { AdminModules } from "./Modules";
 import { AdminRMAccounts } from "./RMAccounts";
@@ -144,6 +145,7 @@ export function AdminPortal({
       case "dashboard": return <AdminDashboard commissions={commissions} />;
       case "approvals": return <AdminApprovals commissions={commissions} onUpdate={onUpdate} onRefresh={onRefresh} />;
       case "tracker": return <AdminTracker commissions={commissions} onUpdate={onUpdate} onRefresh={onRefresh} />;
+      case "assignment": return <AdminCommissionAssignment commissions={commissions} />;
       case "tasks": return <AdminTasks commissions={commissions} />;
       case "testimonials": return <AdminTestimonials />;
       case "announcements": return <AdminAnnouncements />;

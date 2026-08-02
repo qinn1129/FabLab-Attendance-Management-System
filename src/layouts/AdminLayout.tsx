@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Boxes, CpuIcon, Presentation } from "lucide-react";
+import { Boxes, CpuIcon, Presentation, UserCheck } from "lucide-react";
 import { ChevronRight, LogOut, BarChart2, Calendar, CheckCircle, Package, Layers, Bell, Book, Users, User, HelpCircle, MessageSquareQuote } from "lucide-react";
 import { ChatWidget } from "../components/common/ChatWidget";
 import { ThemeToggle } from "../components/common";
@@ -19,6 +19,7 @@ export const ADMIN_NAV = [
   { id: "machines", label: "Machine Status", icon: CpuIcon, category: "Commissions" },
   { id: "approvals", label: "Commission Approval", icon: CheckCircle, category: "Commissions" },
   { id: "tracker", label: "Commission Tracker", icon: Package, category: "Commissions" },
+  { id: "assignment", label: "Commission Assignment", icon: UserCheck, category: "Commissions" },
 
   // Client Page
   { id: "services", label: "Service Offerings", icon: Boxes, category: "Client Page" },
