@@ -1,32 +1,28 @@
 import React, { useState, useEffect } from "react";
-import { Plus, Trash2, ListChecks, History, Package } from "lucide-react";
+import { Plus, Trash2, ListChecks, History } from "lucide-react";
 import { PageHeader, Select, StatusBadge, Input } from "../../components/common";
 import { accountsService, type Account } from "../../services/accountsService";
 import { tasksService, type RMTask, type RMTaskStatus } from "../../services/tasksService";
 import { type Commission } from "../../services/sheetsService";
 import { useDialog } from "../../components/common";
 import { cn } from "../../lib/utils";
+import { formatDateOnly } from "../../lib/dateFormat";
 
 const STATUS_OPTIONS: RMTaskStatus[] = ["Pending", "In Progress", "Completed"];
 
-interface UnifiedTask {
-  id: string;
-  rmId: string;
-  rmName: string;
-  description: string;
-  deadline: string;
-  status: string;
-  source: "Commission" | "Manual";
-  commissionId?: string;
-}
-
 /**
- * Task Assignment view for Admins. Commission-linked workload is pulled
- * LIVE from actual assigned commissions (the source of truth), so it can
- * never drift out of sync — no separate row needs to be manually kept in
- * sync when a commission is approved, reassigned, or completed elsewhere.
- * A separate "Manual Task" flow still exists for one-off work that isn't
- * tied to any commission (e.g. lab upkeep, training).
+ * Manual Tasks & RM Workload. Previously "Commission Assignment" also
+ * mirrored commission-derived rows (client/service/deadline/status per RM)
+ * as its own list — that fully duplicated what Commission Tracker already
+ * shows, so it's been dropped. This page now focuses on what Tracker
+ * *doesn't* cover:
+ *
+ * - Standalone, non-commission work (lab upkeep, training, one-off
+ *   errands) assigned to a Resident Maker with its own status.
+ * - A quick "how busy is each RM right now" read, computed live from
+ *   actual commission status (Pending/In Progress assigned to them) so it
+ *   always matches what Tracker shows — no separate log to fall out of sync.
+ *
  * Domain: Admin
  * @returns {JSX.Element}
  */
@@ -56,41 +52,16 @@ export function AdminTasks({ commissions }: { commissions: Commission[] }) {
 
   useEffect(() => { loadData(); }, []);
 
-  const getMakerId = (name: string): string | undefined =>
-    makers.find(m => `${m.firstName} ${m.lastName}` === name)?.id;
-
   const getMakerName = (id: string): string => {
     const found = makers.find(m => m.id === id);
     return found ? `${found.firstName} ${found.lastName}` : "Unknown / Inactive Maker";
   };
 
-  // Live view — derived directly from currently assigned, still-active
-  // commissions. This is the primary content of the Task Assignment tab.
-  const commissionTasks: UnifiedTask[] = commissions
-    .filter(c => c.rm && (c.status === "Pending" || c.status === "In Progress"))
-    .map(c => ({
-      id: `commission-${c.id}`,
-      rmId: getMakerId(c.rm!) || "",
-      rmName: c.rm!,
-      description: `${c.service} — ${c.client}`,
-      deadline: c.deadline || c.expectedPickupDate || "",
-      status: c.status,
-      source: "Commission" as const,
-      commissionId: c.id,
-    }))
-    .filter(t => t.rmId); // drop any whose assigned name no longer matches an active account
-
-  const manualUnified: UnifiedTask[] = manualTasks.map(t => ({
-    id: t.id,
-    rmId: t.rm_id,
-    rmName: getMakerName(t.rm_id),
-    description: t.task,
-    deadline: t.deadline,
-    status: t.status,
-    source: "Manual" as const,
-  }));
-
-  const allTasks = [...commissionTasks, ...manualUnified];
+  /** Live count of a Resident Maker's currently active (Pending/In Progress) commissions — matches Tracker exactly, since it reads the same commission data instead of a separate log. */
+  const activeCommissionCount = (maker: Account): number => {
+    const fullName = `${maker.firstName} ${maker.lastName}`;
+    return commissions.filter(c => c.rm === fullName && (c.status === "Pending" || c.status === "In Progress")).length;
+  };
 
   async function handleAddTask() {
     setFormError("");
@@ -135,12 +106,12 @@ export function AdminTasks({ commissions }: { commissions: Commission[] }) {
   const makerNameOptions = ["All", ...makers.map(m => `${m.firstName} ${m.lastName}`)];
   const selectedMakerId = filterRM === "All" ? null : makers.find(m => `${m.firstName} ${m.lastName}` === filterRM)?.id;
 
-  const visibleTasks = selectedMakerId ? allTasks.filter(t => t.rmId === selectedMakerId) : allTasks;
+  const visibleTasks = selectedMakerId ? manualTasks.filter(t => t.rm_id === selectedMakerId) : manualTasks;
 
-  const grouped: Record<string, UnifiedTask[]> = {};
+  const grouped: Record<string, RMTask[]> = {};
   visibleTasks.forEach(t => {
-    if (!grouped[t.rmId]) grouped[t.rmId] = [];
-    grouped[t.rmId].push(t);
+    if (!grouped[t.rm_id]) grouped[t.rm_id] = [];
+    grouped[t.rm_id].push(t);
   });
   makers.forEach(m => {
     if (!selectedMakerId || selectedMakerId === m.id) {
@@ -151,8 +122,8 @@ export function AdminTasks({ commissions }: { commissions: Commission[] }) {
   return (
     <div className="p-6">
       <PageHeader
-        title="Task Assignment"
-        sub="Live workload pulled directly from active commissions"
+        title="Manual Tasks & Workload"
+        sub="One-off work not tied to a commission — commission assignments live in Commission Tracker"
         action={
           <button onClick={() => setAdding(o => !o)} className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium px-3 py-2 rounded-lg transition">
             <Plus className="w-4 h-4" />New Manual Task
@@ -163,7 +134,8 @@ export function AdminTasks({ commissions }: { commissions: Commission[] }) {
       {adding && (
         <div className="bg-card rounded-xl border border-emerald-500/30 p-5 mb-5 space-y-3">
           <p className="text-xs text-muted-foreground">
-            Use this only for one-off work not tied to a commission (e.g. lab upkeep, training). Commission assignments already appear automatically below.
+            For work that isn't a commission — e.g. lab upkeep, training, errands.
+            Commission assignments are handled automatically from Commission Approval/Tracker.
           </p>
           <div className="flex flex-col gap-1">
             <label className="text-sm font-medium text-foreground">Task Description <span className="text-red-500">*</span></label>
@@ -210,7 +182,7 @@ export function AdminTasks({ commissions }: { commissions: Commission[] }) {
             <ListChecks className="w-3.5 h-3.5" /> By Resident Maker
           </button>
           <button onClick={() => setView("log")} className={cn("flex items-center gap-1.5 px-4 py-1.5 rounded-md text-sm font-medium transition", view === "log" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-card-foreground")}>
-            <History className="w-3.5 h-3.5" /> All Tasks Log
+            <History className="w-3.5 h-3.5" /> All Manual Tasks Log
           </button>
         </div>
 
@@ -230,47 +202,43 @@ export function AdminTasks({ commissions }: { commissions: Commission[] }) {
       ) : view === "byRM" ? (
         <div className="space-y-4">
           {Object.entries(grouped).map(([rmId, rmTasks]) => {
+            const maker = makers.find(m => m.id === rmId);
             const name = getMakerName(rmId);
+            const activeCommissions = maker ? activeCommissionCount(maker) : 0;
             return (
               <div key={rmId} className="bg-card rounded-xl border border-border overflow-hidden">
-                <div className="px-5 py-3 bg-muted border-b border-border flex items-center gap-2">
-                  <div className="w-7 h-7 rounded-full bg-emerald-500/20 flex items-center justify-center">
+                <div className="px-5 py-3 bg-muted border-b border-border flex items-center gap-2 flex-wrap">
+                  <div className="w-7 h-7 rounded-full bg-emerald-500/20 flex items-center justify-center flex-shrink-0">
                     <span className="text-emerald-500 text-xs font-bold">{name.split(" ").map(n => n[0]).join("")}</span>
                   </div>
                   <span className="font-semibold text-card-foreground text-sm">{name}</span>
-                  <span className="ml-auto text-xs text-muted-foreground font-mono">{rmTasks.length} task{rmTasks.length !== 1 ? "s" : ""}</span>
+                  <span className={cn(
+                    "text-[10px] font-bold px-1.5 py-0.5 rounded border whitespace-nowrap",
+                    activeCommissions > 0 ? "bg-blue-500/10 text-blue-600 border-blue-500/20" : "bg-muted text-muted-foreground border-border"
+                  )}>
+                    {activeCommissions} active commission{activeCommissions !== 1 ? "s" : ""}
+                  </span>
+                  <span className="ml-auto text-xs text-muted-foreground font-mono">{rmTasks.length} manual task{rmTasks.length !== 1 ? "s" : ""}</span>
                 </div>
 
                 {rmTasks.length === 0 ? (
-                  <p className="px-5 py-4 text-muted-foreground text-sm">No active tasks.</p>
+                  <p className="px-5 py-4 text-muted-foreground text-sm">No manual tasks assigned.</p>
                 ) : (
                   <div className="divide-y divide-muted">
                     {rmTasks.map(t => (
                       <div key={t.id} className="px-5 py-3 flex items-center gap-3">
-                        <span className="flex-1 text-sm text-card-foreground">{t.description}</span>
+                        <span className="flex-1 text-sm text-card-foreground">{t.task}</span>
                         {t.deadline && <span className="text-xs font-mono text-muted-foreground">{t.deadline}</span>}
-                        {t.source === "Commission" ? (
-                          <StatusBadge status={t.status} />
-                        ) : (
-                          <select
-                            value={t.status}
-                            onChange={e => handleStatusChange(t.id, e.target.value as RMTaskStatus)}
-                            className="text-xs border border-border bg-background text-foreground rounded px-2 py-1 outline-none focus:ring-1 focus:ring-emerald-400"
-                          >
-                            {STATUS_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
-                          </select>
-                        )}
-                        <span className={cn(
-                          "text-[10px] font-bold px-1.5 py-0.5 rounded flex items-center gap-1 whitespace-nowrap",
-                          t.source === "Commission" ? "bg-blue-500/10 text-blue-600 border border-blue-500/20" : "bg-muted text-muted-foreground border border-border"
-                        )}>
-                          {t.source === "Commission" ? <><Package className="w-2.5 h-2.5" /> {t.commissionId}</> : "Manual"}
-                        </span>
-                        {t.source === "Manual" && (
-                          <button onClick={() => handleDelete(t.id)} className="p-1 text-muted-foreground hover:text-red-500 rounded transition">
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        )}
+                        <select
+                          value={t.status}
+                          onChange={e => handleStatusChange(t.id, e.target.value as RMTaskStatus)}
+                          className="text-xs border border-border bg-background text-foreground rounded px-2 py-1 outline-none focus:ring-1 focus:ring-emerald-400"
+                        >
+                          {STATUS_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
+                        </select>
+                        <button onClick={() => handleDelete(t.id)} className="p-1 text-muted-foreground hover:text-red-500 rounded transition">
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
                       </div>
                     ))}
                   </div>
@@ -284,28 +252,25 @@ export function AdminTasks({ commissions }: { commissions: Commission[] }) {
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-muted border-b border-border">
-                {["Task", "Assigned To", "Source", "Deadline", "Status"].map(h => (
+                {["Task", "Assigned To", "Deadline", "Status", ""].map(h => (
                   <th key={h} className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {allTasks.length === 0 ? (
-                <tr><td colSpan={5} className="px-4 py-6 text-center text-muted-foreground text-sm">No tasks yet.</td></tr>
-              ) : allTasks.map(t => (
+              {manualTasks.length === 0 ? (
+                <tr><td colSpan={5} className="px-4 py-6 text-center text-muted-foreground text-sm">No manual tasks yet.</td></tr>
+              ) : manualTasks.map(t => (
                 <tr key={t.id} className="border-b border-muted hover:bg-muted/50 transition">
-                  <td className="px-4 py-3 text-foreground max-w-[260px]">{t.description}</td>
-                  <td className="px-4 py-3 font-medium text-foreground whitespace-nowrap">{t.rmName}</td>
-                  <td className="px-4 py-3">
-                    <span className={cn(
-                      "text-[10px] font-bold px-1.5 py-0.5 rounded whitespace-nowrap",
-                      t.source === "Commission" ? "bg-blue-500/10 text-blue-600 border border-blue-500/20" : "bg-muted text-muted-foreground border border-border"
-                    )}>
-                      {t.source === "Commission" ? `📦 ${t.commissionId}` : "Manual"}
-                    </span>
-                  </td>
+                  <td className="px-4 py-3 text-foreground max-w-[320px]">{t.task}</td>
+                  <td className="px-4 py-3 font-medium text-foreground whitespace-nowrap">{getMakerName(t.rm_id)}</td>
                   <td className="px-4 py-3 font-mono text-xs text-muted-foreground whitespace-nowrap">{t.deadline || "—"}</td>
                   <td className="px-4 py-3"><StatusBadge status={t.status} /></td>
+                  <td className="px-4 py-3">
+                    <button onClick={() => handleDelete(t.id)} className="p-1 text-muted-foreground hover:text-red-500 rounded transition">
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>

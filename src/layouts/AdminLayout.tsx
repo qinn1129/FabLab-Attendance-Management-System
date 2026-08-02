@@ -27,7 +27,7 @@ export const ADMIN_NAV = [
 
   // Resident Makers and Profile
   { id: "rm-accounts", label: "RM Accounts", icon: Users, category: "Resident Makers and Profile" },
-  { id: "tasks", label: "Commission Assignment", icon: Layers, category: "Resident Makers and Profile" },
+  { id: "tasks", label: "Manual Tasks", icon: Layers, category: "Resident Makers and Profile" },
   { id: "announcements", label: "Announcements", icon: Bell, category: "Resident Makers and Profile" },
   { id: "modules", label: "Modules", icon: Book, category: "Resident Makers and Profile" },
   { id: "faq", label: "FAQ Management", icon: HelpCircle, category: "Resident Makers and Profile" },

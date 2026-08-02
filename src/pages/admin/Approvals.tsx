@@ -5,7 +5,7 @@ import { type Commission } from "../../services/sheetsService";
 import { sendCommissionConfirmationEmail, sendCommissionRejectionEmail, sendRMAssignmentEmail } from "../../services/emailService";
 import { accountsService, type Account } from "../../services/accountsService";
 import { formatDateTime, formatDateOnly } from "../../lib/dateFormat";
-import { tasksService, pickLeastBusyMakerId } from "../../services/tasksService";
+import { pickLeastBusyMakerIdFromCommissions } from "../../services/tasksService";
 import { cn } from "../../lib/utils";
 
 /**
@@ -25,8 +25,8 @@ function resolveDriveLink(c: Commission): string | null {
 
 /**
  * Renders the Commission Approvals view for Admins. Approving opens a modal
- * asking whether to auto-assign (least active-task workload) or manually
- * pick a specific Resident Maker. Rejecting opens a reason prompt — the
+ * asking whether to auto-assign (least current commission workload, live
+ * from commission data) or manually pick a specific Resident Maker. Rejecting opens a reason prompt — the
  * commission is ONLY marked Rejected if the admin actually confirms the
  * prompt; cancelling it (even with an empty reason cancel) leaves the
  * commission untouched. A "More Info" button on each row opens a modal with
@@ -98,41 +98,30 @@ export function AdminApprovals({
 
     let assignedRM: string | null = null;
     let assignedRMEmail: string | null = null;
-    let assignedRMId: string | null = null;
 
     if (makers.length > 0) {
       if (assignMode === "auto") {
-        // Fetch active tasks and use the helper to find the least busy RM
-        const tasks = await tasksService.fetchTasks();
-        const activeMakerIds = makers.map(m => m.id);
-        const leastBusyId = pickLeastBusyMakerId(activeMakerIds, tasks);
-        
+        // Count each RM's live workload straight from commission data
+        // (Pending/In Progress, matched by assigned name) instead of a
+        // separate task log that could drift out of sync — see
+        // pickLeastBusyMakerIdFromCommissions in tasksService.ts.
+        const leastBusyId = pickLeastBusyMakerIdFromCommissions(makers, commissions);
+
         const chosen = makers.find(m => m.id === leastBusyId);
         if (chosen) {
           assignedRM = `${chosen.firstName} ${chosen.lastName}`;
           assignedRMEmail = chosen.email;
-          assignedRMId = chosen.id;
         }
       } else {
         const chosen = makers.find(m => m.id === selectedMakerId);
         if (chosen) {
           assignedRM = `${chosen.firstName} ${chosen.lastName}`;
           assignedRMEmail = chosen.email;
-          assignedRMId = chosen.id;
         }
       }
     }
 
     await onUpdate(commission.id, { status: "Pending", rm: assignedRM });
-
-    if (assignedRMId) {
-      await tasksService.addTask({
-        rm_id: assignedRMId,
-        task: `Commission: ${commission.id} - ${commission.service}`,
-        deadline: commission.expectedPickupDate || "Not Set",
-        source: assignMode === "auto" ? "Auto" : "Manual"
-      });
-    }
 
     if (assignedRM) {
       setAssignedNotice(

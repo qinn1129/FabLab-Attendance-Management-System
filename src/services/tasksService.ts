@@ -1,3 +1,6 @@
+import { type Account } from "./accountsService";
+import { type Commission } from "./sheetsService";
+
 export type RMTaskStatus = "Pending" | "In Progress" | "Completed";
 export type RMTaskSource = "Manual" | "Auto";
 
@@ -18,6 +21,19 @@ const getScriptUrl = (): string | null => {
 
 const getSecret = () => import.meta.env.VITE_WEBAPP_SECRET || "";
 
+/**
+ * This service now backs ONLY standalone, non-commission work items (lab
+ * upkeep, training, one-off errands — see Admin > Manual Tasks). Commission
+ * assignment/workload is tracked in the "commission_reqs" sheet itself
+ * (via Commission.rm / Commission.status), not mirrored here — a prior
+ * version of this app logged a task-sheet row every time a commission was
+ * approved/assigned, purely to power the "least busy RM" auto-assign pick,
+ * but nothing ever updated or cleared those rows when a commission was
+ * later reassigned or completed in the Tracker, so the workload count
+ * could drift arbitrarily far from reality over time. See
+ * pickLeastBusyMakerIdFromCommissions below for the fix — it counts
+ * directly from live commission data instead.
+ */
 export const tasksService = {
   async fetchTasks(): Promise<RMTask[]> {
     const url = getScriptUrl();
@@ -100,21 +116,34 @@ export const tasksService = {
 };
 
 /**
- * Picks the Active RM with the fewest non-Completed tasks. Ties are broken
- * by whoever appears first in `activeMakers` (stable, no randomness) so the
- * result is deterministic and easy to reason about from the Assignment Log.
+ * Counts each active Resident Maker's current commission workload directly
+ * from live commission data (status "Pending" or "In Progress", matched by
+ * assigned name), then returns whichever RM has the fewest. Ties are broken
+ * by whoever appears first in `activeMakers` (stable, no randomness).
+ *
+ * Replaces the old tasks-sheet-based counter, which could drift from
+ * reality once a commission was reassigned or completed in the Tracker
+ * (nothing updated the corresponding task-log row when that happened).
+ * This always reflects the Tracker's current state, since it reads the
+ * same `commissions` data the Tracker itself displays.
  */
-export function pickLeastBusyMakerId(
-  activeMakerIds: string[],
-  tasks: RMTask[]
+export function pickLeastBusyMakerIdFromCommissions(
+  activeMakers: Account[],
+  commissions: Commission[]
 ): string | null {
-  if (activeMakerIds.length === 0) return null;
+  if (activeMakers.length === 0) return null;
+
   const load: Record<string, number> = {};
-  activeMakerIds.forEach(id => (load[id] = 0));
-  tasks.forEach(t => {
-    if (t.status !== "Completed" && load[t.rm_id] !== undefined) {
-      load[t.rm_id] += 1;
-    }
+  activeMakers.forEach(m => { load[m.id] = 0; });
+
+  const nameToId = new Map(activeMakers.map(m => [`${m.firstName} ${m.lastName}`, m.id]));
+
+  commissions.forEach(c => {
+    if (!c.rm) return;
+    if (c.status !== "Pending" && c.status !== "In Progress") return;
+    const id = nameToId.get(c.rm);
+    if (id !== undefined) load[id] += 1;
   });
-  return activeMakerIds.reduce((best, id) => (load[id] < load[best] ? id : best), activeMakerIds[0]);
+
+  return activeMakers.reduce((best, m) => (load[m.id] < load[best] ? m.id : best), activeMakers[0].id);
 }
