@@ -228,7 +228,7 @@ export function AdminTasks({ commissions }: { commissions: Commission[] }) {
                     {rmTasks.map(t => (
                       <div key={t.id} className="px-5 py-3 flex items-center gap-3">
                         <span className="flex-1 text-sm text-card-foreground">{t.task}</span>
-                        {t.deadline && <span className="text-xs font-mono text-muted-foreground">{t.deadline}</span>}
+                        {t.deadline && <span className="text-xs font-mono text-muted-foreground">{formatDateOnly(t.deadline)}</span>}
                         <select
                           value={t.status}
                           onChange={e => handleStatusChange(t.id, e.target.value as RMTaskStatus)}
@@ -264,7 +264,7 @@ export function AdminTasks({ commissions }: { commissions: Commission[] }) {
                 <tr key={t.id} className="border-b border-muted hover:bg-muted/50 transition">
                   <td className="px-4 py-3 text-foreground max-w-[320px]">{t.task}</td>
                   <td className="px-4 py-3 font-medium text-foreground whitespace-nowrap">{getMakerName(t.rm_id)}</td>
-                  <td className="px-4 py-3 font-mono text-xs text-muted-foreground whitespace-nowrap">{t.deadline || "—"}</td>
+                  <td className="px-4 py-3 font-mono text-xs text-muted-foreground whitespace-nowrap">{t.deadline ? formatDateOnly(t.deadline) : "—"}</td>
                   <td className="px-4 py-3"><StatusBadge status={t.status} /></td>
                   <td className="px-4 py-3">
                     <button onClick={() => handleDelete(t.id)} className="p-1 text-muted-foreground hover:text-red-500 rounded transition">

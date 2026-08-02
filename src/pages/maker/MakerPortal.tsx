@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { Users, ArrowLeft } from "lucide-react";
 import { Input, Select } from "../../components/common";
 import { MakerLayout } from "../../layouts/MakerLayout";
 import { MakerDashboard } from "./Dashboard";
 import { MakerAttendance } from "./Attendance";
-import { MakerCommissions } from "./Commissions";
+import { MakerCommissionsAndTasks } from "./Commissions";
 import { MakerResources } from "./Resources";
 import { MakerProfile } from "./Profile";
 import { MakerReservations } from "./Reservations";
@@ -13,6 +13,11 @@ import { rememberMe } from "../../lib/rememberMe";
 import { type Commission } from "../../services/sheetsService";
 import { ALL_DLSU_PROGRAMS } from "../../constants/DLSUPrograms";
 import { YEAR_LEVEL_OPTIONS } from "../../constants/yearLevels";
+import { tasksService, type RMTask, type RMTaskStatus } from "../../services/tasksService";
+import { hasUnseenIds, markIdsSeen } from "../../lib/rmNotifications";
+
+/** How often to re-poll manual tasks while logged in, purely to keep the notification badge current — matches the cadence used elsewhere for background polling (e.g. Machine Status). */
+const TASKS_POLL_INTERVAL_MS = 30000;
 
 export function MakerPortal({
   onBack,
@@ -31,6 +36,7 @@ export function MakerPortal({
   const [account, setAccount] = useState<Account | null>(null);
   const [checkingSession, setCheckingSession] = useState(true);
   const [fridayNotificationDismissed, setFridayNotificationDismissed] = useState(false);
+  const [myTasks, setMyTasks] = useState<RMTask[]>([]);
 
   // Auto-dismiss Friday schedule notification when navigating to a different tab
   useEffect(() => {
@@ -70,6 +76,57 @@ export function MakerPortal({
       setCheckingSession(false);
     })();
   }, []);
+
+  // Poll this RM's manual tasks while logged in — used both to display
+  // "My Manual Tasks" and to drive the "My Commissions and Tasks" nav badge.
+  useEffect(() => {
+    if (!loggedIn || !account) return;
+
+    let cancelled = false;
+    const loadMyTasks = async () => {
+      const all = await tasksService.fetchTasks();
+      if (cancelled) return;
+      setMyTasks(all.filter(t => t.rm_id === account.id));
+    };
+
+    loadMyTasks();
+    const interval = setInterval(loadMyTasks, TASKS_POLL_INTERVAL_MS);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [loggedIn, account]);
+
+  const handleTaskStatusChange = async (id: string, status: RMTaskStatus) => {
+    setMyTasks(prev => prev.map(t => t.id === id ? { ...t, status } : t));
+    await tasksService.updateTask(id, { status });
+  };
+
+  // IDs currently "relevant" to the notification badge: active (Pending/In
+  // Progress) commissions assigned to this RM, plus their non-Completed
+  // manual tasks. Recomputed whenever commissions/tasks/account change.
+  const relevantIds = useMemo(() => {
+    if (!account) return [] as string[];
+    const makerFullName = `${account.firstName} ${account.lastName}`;
+    const commissionIds = commissions
+      .filter(c => c.rm === makerFullName && (c.status === "Pending" || c.status === "In Progress"))
+      .map(c => c.id);
+    const taskIds = myTasks.filter(t => t.status !== "Completed").map(t => t.id);
+    return [...commissionIds, ...taskIds];
+  }, [account, commissions, myTasks]);
+
+  const relevantIdsKey = relevantIds.join(",");
+
+  const hasCommissionsNotification = account ? hasUnseenIds(account.id, relevantIds) : false;
+
+  // Opening the combined tab marks everything currently relevant as seen,
+  // clearing the badge. Re-runs if new IDs show up while the tab stays open.
+  useEffect(() => {
+    if (screen === "commissions" && account && relevantIds.length > 0) {
+      markIdsSeen(account.id, relevantIds);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [screen, account?.id, relevantIdsKey]);
 
   const handleLogin = async () => {
     setLoginError("");
@@ -135,6 +192,7 @@ export function MakerPortal({
      setEmail("");
      setPass("");
      setRemember(false);
+     setMyTasks([]);
    };
 
   if (checkingSession) {
@@ -250,7 +308,16 @@ export function MakerPortal({
         );
       case "attendance": return <MakerAttendance account={account!} onAccountUpdate={setAccount} />;
       case "reservations": return <MakerReservations account={account!} />;
-      case "commissions": return <MakerCommissions commissions={commissions} onUpdate={onUpdate} makerName={makerName} />;
+      case "commissions":
+        return (
+          <MakerCommissionsAndTasks
+            commissions={commissions}
+            onUpdate={onUpdate}
+            makerName={makerName}
+            tasks={myTasks}
+            onTaskStatusChange={handleTaskStatusChange}
+          />
+        );
       case "resources": return <MakerResources />;
       case "profile": return <MakerProfile account={account!} onAccountUpdate={setAccount} />;
       default:
@@ -266,7 +333,13 @@ export function MakerPortal({
   };
 
   return (
-    <MakerLayout currentScreen={screen} setScreen={setScreen} onLogout={handleLogout} makerName={`${account!.firstName} ${account!.lastName}`}>
+    <MakerLayout
+      currentScreen={screen}
+      setScreen={setScreen}
+      onLogout={handleLogout}
+      makerName={`${account!.firstName} ${account!.lastName}`}
+      commissionsBadge={hasCommissionsNotification}
+    >
       {renderScreen()}
     </MakerLayout>
   );

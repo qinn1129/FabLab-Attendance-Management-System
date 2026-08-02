@@ -11,7 +11,7 @@ export const RM_NAV = [
   { id: "dashboard", label: "Dashboard", icon: Home },
   { id: "attendance", label: "Attendance", icon: Clock },
   { id: "reservations", label: "Reservations", icon: Calendar },
-  { id: "commissions", label: "My Commissions", icon: Package },
+  { id: "commissions", label: "Commissions & Tasks", icon: Package },
   { id: "resources", label: "Resources", icon: Book },
   { id: "profile", label: "Profile", icon: User },
 ];
@@ -25,6 +25,8 @@ interface MakerLayoutProps {
   setScreen: (screen: string) => void;
   onLogout: () => void;
   makerName: string;
+  /** Shows a small red dot on the "My Commissions and Tasks" nav item when there's a newly assigned commission or manual task the RM hasn't opened that tab to see yet. */
+  commissionsBadge?: boolean;
 }
 
 /**
@@ -32,7 +34,7 @@ interface MakerLayoutProps {
  * @param {MakerLayoutProps} props
  * @returns {JSX.Element}
  */
-export function MakerLayout({ children, currentScreen, setScreen, onLogout, makerName }: MakerLayoutProps) {
+export function MakerLayout({ children, currentScreen, setScreen, onLogout, makerName, commissionsBadge }: MakerLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
   return (
@@ -53,18 +55,28 @@ export function MakerLayout({ children, currentScreen, setScreen, onLogout, make
           {RM_NAV.map(n => {
             const Icon = n.icon;
             const active = currentScreen === n.id;
+            const showBadge = n.id === "commissions" && commissionsBadge;
             return (
               <button
                 key={n.id}
                 onClick={() => setScreen(n.id)}
                 title={!sidebarOpen ? n.label : undefined}
                 className={cn(
-                  "w-full flex items-center gap-2.5 px-3 py-2 text-sm transition-all",
+                  "relative w-full flex items-center gap-2.5 px-3 py-2 text-sm transition-all",
                   active ? "bg-sidebar-accent/50 text-sidebar-primary border-r-2 border-sidebar-primary" : "text-sidebar-foreground/50 hover:text-sidebar-foreground hover:bg-sidebar-accent/30"
                 )}
               >
                 <Icon className="w-4 h-4 flex-shrink-0" />
-                {sidebarOpen && <span className="truncate">{n.label}</span>}
+                {sidebarOpen && <span className="truncate flex-1 text-left">{n.label}</span>}
+                {showBadge && (
+                  <span
+                    className={cn(
+                      "rounded-full bg-red-500 flex-shrink-0",
+                      sidebarOpen ? "w-2 h-2" : "w-2 h-2 absolute top-1.5 right-1.5"
+                    )}
+                    title="New commission or task assigned"
+                  />
+                )}
               </button>
             );
           })}
