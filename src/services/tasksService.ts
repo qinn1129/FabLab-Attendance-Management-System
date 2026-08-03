@@ -127,6 +127,8 @@ export const tasksService = {
  * This always reflects the Tracker's current state, since it reads the
  * same `commissions` data the Tracker itself displays.
  */
+import { isCommissionAssignedToMaker } from "../lib/commissionUtils";
+
 export function pickLeastBusyMakerIdFromCommissions(
   activeMakers: Account[],
   commissions: Commission[]
@@ -136,13 +138,13 @@ export function pickLeastBusyMakerIdFromCommissions(
   const load: Record<string, number> = {};
   activeMakers.forEach(m => { load[m.id] = 0; });
 
-  const nameToId = new Map(activeMakers.map(m => [`${m.firstName} ${m.lastName}`, m.id]));
-
   commissions.forEach(c => {
     if (!c.rm) return;
     if (c.status !== "Pending" && c.status !== "In Progress") return;
-    const id = nameToId.get(c.rm);
-    if (id !== undefined) load[id] += 1;
+    const assignedMaker = activeMakers.find(m => isCommissionAssignedToMaker(c, m));
+    if (assignedMaker) {
+      load[assignedMaker.id] += 1;
+    }
   });
 
   return activeMakers.reduce((best, m) => (load[m.id] < load[best] ? m.id : best), activeMakers[0].id);

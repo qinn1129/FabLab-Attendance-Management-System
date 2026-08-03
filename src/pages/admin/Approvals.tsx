@@ -7,21 +7,7 @@ import { accountsService, type Account } from "../../services/accountsService";
 import { formatDateTime, formatDateOnly } from "../../lib/dateFormat";
 import { pickLeastBusyMakerIdFromCommissions } from "../../services/tasksService";
 import { cn } from "../../lib/utils";
-
-/**
- * Resolves the best available Google Drive (or other file) link for a
- * commission: prefers the dedicated `driveLink` field, falling back to
- * `file` when it looks like an actual URL rather than a filename/placeholder
- * (older rows sometimes stored the link directly in `file`). Returns null
- * when there's nothing clickable to show.
- */
-function resolveDriveLink(c: Commission): string | null {
-  const direct = (c.driveLink || "").trim();
-  if (direct) return direct;
-  const fromFile = (c.file || "").trim();
-  if (/^https?:\/\//i.test(fromFile)) return fromFile;
-  return null;
-}
+import { resolveDriveLink } from "../../lib/commissionUtils";
 
 /**
  * Renders the Commission Approvals view for Admins. Approving opens a modal

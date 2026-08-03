@@ -1,5 +1,4 @@
-import React, { useState } from "react";
-import { useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { Check, Edit2, X, Info, RefreshCw, ExternalLink } from "lucide-react";
 import { PageHeader, StatusBadge } from "../../components/common";
 import { accountsService, type Account } from "../../services/accountsService";
@@ -7,21 +6,7 @@ import { type Commission } from "../../services/sheetsService";
 import { sendRMAssignmentEmail, sendRMUnassignedEmail } from "../../services/emailService";
 import { cn } from "../../lib/utils";
 import { formatDateOnly } from "../../lib/dateFormat";
-
-/**
- * Resolves the best available Google Drive (or other file) link for a
- * commission: prefers the dedicated `driveLink` field, falling back to
- * `file` when it looks like an actual URL rather than a filename/placeholder
- * (older rows sometimes stored the link directly in `file`). Returns null
- * when there's nothing clickable to show.
- */
-function resolveDriveLink(c: Commission): string | null {
-  const direct = (c.driveLink || "").trim();
-  if (direct) return direct;
-  const fromFile = (c.file || "").trim();
-  if (/^https?:\/\//i.test(fromFile)) return fromFile;
-  return null;
-}
+import { getMakerForCommission, getMakerDisplayName, isCommissionAssignedToMaker, resolveDriveLink } from "../../lib/commissionUtils";
 
 /**
  * Renders the full Commission Tracker for Admins to view and assign.
@@ -94,8 +79,10 @@ export function AdminTracker({
 
   const startEdit = (c: Commission) => {
     setEditId(c.id);
+    const matchedMaker = getMakerForCommission(c, makers);
+    const resolvedRm = matchedMaker ? `${matchedMaker.firstName} ${matchedMaker.lastName}` : (c.rm || "");
     setEditForm({
-      rm: c.rm || "",
+      rm: resolvedRm,
       printer: c.printer || "",
       deadline: c.deadline || "",
       problems: c.problems || "",
@@ -105,7 +92,8 @@ export function AdminTracker({
 
   const findMakerByName = (name: string | null): Account | undefined => {
     if (!name) return undefined;
-    return makers.find(m => `${m.firstName} ${m.lastName}` === name);
+    const dummy = { rm: name } as Commission;
+    return makers.find(m => isCommissionAssignedToMaker(dummy, m));
   };
 
   const handleSaveAssignment = async (id: string) => {
@@ -296,7 +284,7 @@ export function AdminTracker({
                         ))}
                       </select>
                     ) : (
-                      <span className={c.rm ? "text-card-foreground" : "text-muted-foreground italic"}>{c.rm || "Unassigned"}</span>
+                      <span className={c.rm ? "text-card-foreground" : "text-muted-foreground italic"}>{getMakerDisplayName(c.rm, makers)}</span>
                     )}
                   </td>
 

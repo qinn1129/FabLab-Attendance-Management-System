@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from "react";
-import { Clock, AlertTriangle, Calendar, Save, Trash2, Check } from "lucide-react";
+import { Clock, AlertTriangle, Calendar, Save, Trash2, Check, TrendingUp, Award, BarChart3, Timer } from "lucide-react";
 import { PageHeader, Select, Input, useDialog } from "../../components/common";
 import { cn } from "../../lib/utils";
 import { accountsService, parseScheduleDays, stringifyScheduleDays, type Account } from "../../services/accountsService";
 import { formatDateTime } from "../../lib/dateFormat";
 import { sheetsService, type AttendanceLog, type AttendanceRequest } from "../../services/sheetsService";
+
+const WEEKLY_HOURS_TARGET = 20;
 
 const dayMap: Record<string, string> = {
   "Mon": "Monday",
@@ -515,37 +517,121 @@ export function MakerAttendance({
       </div>
 
       {tab === "clock" && (
-        <div className="max-w-sm">
-          <div className="bg-card rounded-2xl border border-border p-8 text-center mb-4 animate-fade-in">
-            <div className={cn("w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-4 transition-all", clockedIn ? "bg-emerald-500/20 ring-4 ring-emerald-500/30 animate-pulse" : "bg-muted")}>
-              <Clock className={cn("w-12 h-12", clockedIn ? "text-emerald-500" : "text-muted-foreground")} />
-            </div>
-            <p className="text-3xl font-bold text-foreground mb-1 font-mono tracking-wider">
-              {currentTime.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
-            </p>
-            <p className="text-muted-foreground text-sm mb-2">{currentTime.toLocaleDateString([], { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl animate-fade-in">
+          {/* Time In / Time Out Action Card */}
+          <div className="flex flex-col justify-between">
+            <div className="bg-card rounded-2xl border border-border p-8 text-center mb-4 flex-1 flex flex-col items-center justify-center min-h-[260px]">
+              <div className={cn("w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-4 transition-all", clockedIn ? "bg-emerald-500/20 ring-4 ring-emerald-500/30 animate-pulse" : "bg-muted")}>
+                <Clock className={cn("w-12 h-12", clockedIn ? "text-emerald-500" : "text-muted-foreground")} />
+              </div>
+              <p className="text-3xl font-bold text-foreground mb-1 font-mono tracking-wider">
+                {currentTime.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+              </p>
+              <p className="text-muted-foreground text-sm mb-2">{currentTime.toLocaleDateString([], { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
               {clockedIn && activeSession && (
                 <p className="text-emerald-500 text-sm font-medium bg-emerald-500/10 px-3 py-1 rounded-full w-fit mx-auto mt-2 border border-emerald-500/20">
                   Clocked in at {formatDateTime(activeSession.clock_in_timestamp)}
                 </p>
               )}
-          </div>
-          <button
-            onClick={clockedIn ? handleClockOut : handleClockIn}
-            disabled={loadingSession}
-            className={cn(
-              "w-full py-4 rounded-xl font-bold text-lg transition flex items-center justify-center gap-2", 
-              clockedIn ? "bg-red-500 hover:bg-red-600 text-white" : "bg-emerald-600 hover:bg-emerald-700 text-white",
-              loadingSession && "opacity-50 cursor-not-allowed"
-            )}
-          >
-            {loadingSession ? "Processing..." : clockedIn ? "⏹ Clock Out" : "▶ Clock In"}
-          </button>
-          {clockedIn && activeSession && (
-            <div className="mt-3 bg-emerald-500/10 rounded-xl border border-emerald-500/20 p-3 text-center animate-fade-in">
-              <p className="text-emerald-600 text-sm">Current session: <strong className="font-mono">{getSessionDuration()}</strong></p>
             </div>
-          )}
+
+            <div>
+              <button
+                onClick={clockedIn ? handleClockOut : handleClockIn}
+                disabled={loadingSession}
+                className={cn(
+                  "w-full py-4 rounded-xl font-bold text-lg transition flex items-center justify-center gap-2 shadow-sm", 
+                  clockedIn ? "bg-red-500 hover:bg-red-600 text-white" : "bg-emerald-600 hover:bg-emerald-700 text-white",
+                  loadingSession && "opacity-50 cursor-not-allowed"
+                )}
+              >
+                {loadingSession ? "Processing..." : clockedIn ? "⏹ Clock Out" : "▶ Clock In"}
+              </button>
+              {clockedIn && activeSession && (
+                <div className="mt-3 bg-emerald-500/10 rounded-xl border border-emerald-500/20 p-3 text-center animate-fade-in">
+                  <p className="text-emerald-600 text-sm">Current session: <strong className="font-mono">{getSessionDuration()}</strong></p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Hours Logged Summary Panel */}
+          <div className="bg-card rounded-2xl border border-border p-6 flex flex-col justify-between">
+            <div>
+              <div className="flex items-center gap-2.5 pb-4 mb-5 border-b border-border">
+                <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-600">
+                  <BarChart3 className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-foreground text-base">Logged Hours Summary</h3>
+                  <p className="text-xs text-muted-foreground">Your attendance record overview</p>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                {/* Time Logged This Week */}
+                <div className="p-4 rounded-xl border border-border bg-muted/30">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                      <Timer className="w-3.5 h-3.5 text-emerald-500" />
+                      Logged This Week
+                    </span>
+                    <span className="text-xs font-mono font-medium text-emerald-600 bg-emerald-500/10 px-2 py-0.5 rounded">
+                      Target: {WEEKLY_HOURS_TARGET}h
+                    </span>
+                  </div>
+                  <div className="flex items-baseline justify-between mb-2">
+                    <span className="text-3xl font-bold font-mono text-foreground">
+                      {Number(account.hoursWeek || 0).toFixed(1)} <span className="text-sm font-normal text-muted-foreground">hrs</span>
+                    </span>
+                    <span className="text-xs font-medium text-muted-foreground">
+                      {Math.min(100, Math.round(((Number(account.hoursWeek) || 0) / WEEKLY_HOURS_TARGET) * 100))}% completed
+                    </span>
+                  </div>
+                  {/* Progress Bar */}
+                  <div className="w-full bg-muted rounded-full h-2 overflow-hidden border border-border/50">
+                    <div 
+                      className="bg-emerald-500 h-full rounded-full transition-all duration-500" 
+                      style={{ width: `${Math.min(100, Math.round(((Number(account.hoursWeek) || 0) / WEEKLY_HOURS_TARGET) * 100))}%` }} 
+                    />
+                  </div>
+                </div>
+
+                {/* Total Time Logged */}
+                <div className="p-4 rounded-xl border border-border bg-muted/30">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                      <Award className="w-3.5 h-3.5 text-violet-500" />
+                      Total Time Logged
+                    </span>
+                    <span className="text-xs font-medium text-muted-foreground">
+                      Cumulative
+                    </span>
+                  </div>
+                  <div className="flex items-baseline justify-between">
+                    <span className="text-3xl font-bold font-mono text-foreground">
+                      {Number(account.totalHours || 0).toFixed(1)} <span className="text-sm font-normal text-muted-foreground">hrs</span>
+                    </span>
+                    <span className="text-xs font-medium text-violet-600 bg-violet-500/10 px-2.5 py-1 rounded-full flex items-center gap-1">
+                      <TrendingUp className="w-3 h-3" /> All-Time
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Active Session Indicator Footer */}
+            {clockedIn ? (
+              <div className="mt-5 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-600 flex items-center gap-2">
+                <Clock className="w-4 h-4 text-amber-500 flex-shrink-0 animate-spin" style={{ animationDuration: '3s' }} />
+                <span>Active session in progress. Duration will be added to your weekly and total hours upon clock out.</span>
+              </div>
+            ) : (
+              <div className="mt-5 p-3 rounded-xl bg-muted/40 border border-border/60 text-xs text-muted-foreground text-center">
+                Clock in to start recording shift hours for this week.
+              </div>
+            )}
+          </div>
         </div>
       )}
 

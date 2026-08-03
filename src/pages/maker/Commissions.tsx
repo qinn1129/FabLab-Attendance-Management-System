@@ -1,10 +1,13 @@
 import React, { useState } from "react";
-import { Package, Edit2, Check, X, AlertTriangle, ClipboardList, Clock } from "lucide-react";
+import { Package, Edit2, Check, X, AlertTriangle, ClipboardList, Clock, ExternalLink } from "lucide-react";
 import { PageHeader, StatusBadge } from "../../components/common";
 import { cn } from "../../lib/utils";
 import { type Commission } from "../../services/sheetsService";
 import { type RMTask, type RMTaskStatus } from "../../services/tasksService";
 import { formatDateOnly } from "../../lib/dateFormat";
+
+import { type Account } from "../../services/accountsService";
+import { isCommissionAssignedToMaker, resolveDriveLink } from "../../lib/commissionUtils";
 
 const TASK_STATUS_OPTIONS: RMTaskStatus[] = ["Pending", "In Progress", "Completed"];
 
@@ -20,19 +23,21 @@ export function MakerCommissionsAndTasks({
   commissions,
   onUpdate,
   makerName,
+  account,
   tasks,
   onTaskStatusChange
 }: {
   commissions: Commission[];
   onUpdate: (id: string, updates: Partial<Commission>) => Promise<void>;
   makerName: string;
+  account?: Account;
   tasks: RMTask[];
   onTaskStatusChange: (id: string, status: RMTaskStatus) => Promise<void>;
 }) {
   const [subTab, setSubTab] = useState<"commissions" | "tasks">("commissions");
 
   const approvedComms = commissions.filter(
-    c => c.rm === makerName && (c.status === "In Progress" || c.status === "Completed" || c.status === "Pending")
+    c => isCommissionAssignedToMaker(c, account || makerName) && (c.status === "In Progress" || c.status === "Completed" || c.status === "Pending")
   );
   const activeTasks = tasks.filter(t => t.status !== "Completed");
 
@@ -123,6 +128,7 @@ function MyCommissions({
         </div>
       ) : commissions.map(c => {
         const isEditing = editId === c.id;
+        const driveLink = resolveDriveLink(c);
 
         return (
           <div
@@ -131,15 +137,40 @@ function MyCommissions({
           >
             <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 mb-4">
               <div>
-                <div className="flex items-center gap-2 mb-2">
+                <div className="flex items-center gap-2 mb-2 flex-wrap">
                   <span className="font-mono text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">{c.id}</span>
                   <span className="font-semibold text-foreground text-sm">{c.client}</span>
+                  {driveLink && (
+                    <a
+                      href={driveLink}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-400 hover:bg-blue-500/20 text-xs font-medium border border-blue-500/20 transition"
+                    >
+                      <ExternalLink className="w-3 h-3" /> Drive Link
+                    </a>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-1.5 text-xs text-muted-foreground">
                   <div><span className="font-medium text-foreground/75">Service:</span> {c.service}</div>
                   <div><span className="font-medium text-foreground/75">Material:</span> {c.color} {c.filament}</div>
                   <div><span className="font-medium text-foreground/75">Urgency:</span> {c.urgency}</div>
+                  <div>
+                    <span className="font-medium text-foreground/75">Drive Link:</span>{" "}
+                    {driveLink ? (
+                      <a
+                        href={driveLink}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1 text-blue-500 hover:text-blue-600 underline font-medium"
+                      >
+                        Open <ExternalLink className="w-3 h-3" />
+                      </a>
+                    ) : (
+                      <span className="text-muted-foreground/50 italic">No link provided</span>
+                    )}
+                  </div>
 
                   {!isEditing && (
                     <>

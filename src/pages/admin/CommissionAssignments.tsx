@@ -5,6 +5,8 @@ import { accountsService, type Account } from "../../services/accountsService";
 import { type Commission } from "../../services/sheetsService";
 import { formatDateOnly } from "../../lib/dateFormat";
 
+import { isCommissionAssignedToMaker } from "../../lib/commissionUtils";
+
 interface RMWorkload {
   maker: Account;
   inProgressCommissions: Commission[];
@@ -27,8 +29,7 @@ export function AdminCommissionAssignment({ commissions }: { commissions: Commis
 
   const workloads: RMWorkload[] = useMemo(() => {
     return makers.map(maker => {
-      const fullName = `${maker.firstName} ${maker.lastName}`;
-      const mine = commissions.filter(c => c.rm === fullName);
+      const mine = commissions.filter(c => isCommissionAssignedToMaker(c, maker));
       return {
         maker,
         inProgressCommissions: mine.filter(c => c.status === "In Progress").sort(sortByDeadline),

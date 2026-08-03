@@ -7,6 +7,7 @@ import { type Commission } from "../../services/sheetsService";
 import { useDialog } from "../../components/common";
 import { cn } from "../../lib/utils";
 import { formatDateOnly } from "../../lib/dateFormat";
+import { isCommissionAssignedToMaker } from "../../lib/commissionUtils";
 
 const STATUS_OPTIONS: RMTaskStatus[] = ["Pending", "In Progress", "Completed"];
 
@@ -59,8 +60,7 @@ export function AdminTasks({ commissions }: { commissions: Commission[] }) {
 
   /** Live count of a Resident Maker's currently active (Pending/In Progress) commissions — matches Tracker exactly, since it reads the same commission data instead of a separate log. */
   const activeCommissionCount = (maker: Account): number => {
-    const fullName = `${maker.firstName} ${maker.lastName}`;
-    return commissions.filter(c => c.rm === fullName && (c.status === "Pending" || c.status === "In Progress")).length;
+    return commissions.filter(c => isCommissionAssignedToMaker(c, maker) && (c.status === "Pending" || c.status === "In Progress")).length;
   };
 
   async function handleAddTask() {

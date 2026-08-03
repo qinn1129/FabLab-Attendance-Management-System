@@ -5,6 +5,8 @@ import { type Commission } from "../../services/sheetsService";
 import { type Account } from "../../services/accountsService";
 import { announcementsService, type Announcement } from "../../services/announcementsService";
 
+import { isCommissionAssignedToMaker } from "../../lib/commissionUtils";
+
 const WEEKLY_HOURS_TARGET = 20;
 const ANNOUNCEMENTS_PER_PAGE = 5;
 
@@ -24,8 +26,7 @@ export function MakerDashboard({
   showFridayNotification?: boolean;
   onDismissFridayNotification?: () => void;
 }) {
-  const makerName = `${account.firstName} ${account.lastName}`;
-  const myCommissions = commissions.filter(c => c.rm === makerName);
+  const myCommissions = commissions.filter(c => isCommissionAssignedToMaker(c, account));
   const activeCount = myCommissions.filter(c => c.status === "In Progress" || c.status === "Pending").length;
   const completedCount = myCommissions.filter(c => c.status === "Completed").length;
 

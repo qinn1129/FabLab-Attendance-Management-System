@@ -314,6 +314,7 @@ export function MakerPortal({
             commissions={commissions}
             onUpdate={onUpdate}
             makerName={makerName}
+            account={account!}
             tasks={myTasks}
             onTaskStatusChange={handleTaskStatusChange}
           />
