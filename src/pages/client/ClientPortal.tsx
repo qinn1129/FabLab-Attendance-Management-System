@@ -683,7 +683,7 @@ export function ClientPortal({
                 )}
 
                 <div className="flex flex-col gap-1">
-                  <label className="text-sm font-medium text-gray-700">Additional Notes</label>
+                  <label className="text-sm font-medium text-gray-700">Notes</label>
                   <textarea value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} rows={3} placeholder="Dimensions, infill percentage, specific instructions..." className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm text-gray-900 bg-white outline-none focus:ring-2 focus:ring-violet-400 resize-none" />
                 </div>
 
@@ -775,24 +775,11 @@ export function ClientPortal({
                   Your commission request has been sent to our Resident Makers.
                 </p>
 
-                <div className="mb-8 p-5 bg-blue-50 text-blue-800 rounded-2xl border border-blue-100 text-xs text-left space-y-3">
-                  <p className="font-bold text-sm text-blue-900 flex items-center gap-1.5">
-                    <Mail className="w-4 h-4" /> System Dispatch Notification (Mock Logs)
-                  </p>
-                  <div className="space-y-1.5 font-mono text-[11px] text-blue-950">
-                    {mockLogs.map((log, idx) => (
-                      <p key={idx} className="flex gap-1.5">
-                        <span>➔</span>
-                        <span>{log}</span>
-                      </p>
-                    ))}
-                  </div>
-                  <div className="pt-2 border-t border-blue-200 space-y-1.5 text-blue-700">
-                    <p>📧 Please refer to your registered email for additional details and pricing.</p>
-                    <p>📧 Support Email: <strong className="text-blue-950">domie.jucutan@dlsu.edu.ph</strong></p>
-                    <p>📞 Contact Number: <strong className="text-blue-950">09209540688</strong></p>
-                    <p>🌐 Facebook Page: <a href="https://www.facebook.com/animolabsph" target="_blank" rel="noopener noreferrer" className="text-blue-950 underline font-semibold hover:text-blue-900">facebook.com/animolabsph</a></p>
-                  </div>
+                <div className="mb-8 p-5 bg-blue-50 text-blue-800 rounded-2xl border border-blue-100 text-xs text-left space-y-2">
+                  <p>📧 Please refer to your registered email for additional details and pricing.</p>
+                  <p>📧 Support Email: <strong className="text-blue-950">domie.jucutan@dlsu.edu.ph</strong></p>
+                  <p>📞 Contact Number: <strong className="text-blue-950">09209540688</strong></p>
+                  <p>🌐 Facebook Page: <a href="https://www.facebook.com/animolabsph" target="_blank" rel="noopener noreferrer" className="text-blue-950 underline font-semibold hover:text-blue-900">facebook.com/animolabsph</a></p>
                 </div>
 
                 <button onClick={() => { setStep(0); }} className="bg-gray-900 hover:bg-gray-800 text-white font-semibold px-6 py-3 rounded-xl transition">

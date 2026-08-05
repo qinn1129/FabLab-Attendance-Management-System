@@ -50,6 +50,17 @@ export function AdminApprovals({
   const [confirming, setConfirming] = useState(false);
   const [rejectingId, setRejectingId] = useState<string | null>(null);
 
+  const [copiedKey, setCopiedKey] = useState<string | null>(null);
+
+  const handleCopyEmail = (email: string, key: string, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    navigator.clipboard.writeText(email);
+    setCopiedKey(key);
+    setTimeout(() => {
+      setCopiedKey(prev => (prev === key ? null : prev));
+    }, 1500);
+  };
+
   async function handleRefresh() {
     if (!onRefresh || refreshing) return;
     setRefreshing(true);
@@ -271,8 +282,19 @@ export function AdminApprovals({
 
                 {/*Contact*/}
                 <div>
-                  <p className="text-xs text-muted-foreground">Contact</p>
-                  <p className="text-sm text-card-foreground truncate">{item.clientEmail}</p>
+                  <p className="text-xs text-muted-foreground">Contact Email</p>
+                  {item.clientEmail ? (
+                    <button
+                      type="button"
+                      onClick={(e) => handleCopyEmail(item.clientEmail!, item.id, e)}
+                      className="text-sm font-medium text-blue-500 hover:text-blue-600 underline break-all font-mono block text-left cursor-pointer"
+                      title="Click to copy email address"
+                    >
+                      {copiedKey === item.id ? "Copied!" : item.clientEmail}
+                    </button>
+                  ) : (
+                    <p className="text-sm text-muted-foreground/50 italic">—</p>
+                  )}
                 </div>
 
                 {/*Drive Link*/}
@@ -447,7 +469,7 @@ export function AdminApprovals({
               </div>
 
               <div className="col-span-2">
-                <p className="text-xs text-muted-foreground mb-0.5">Additional Notes</p>
+                <p className="text-xs text-muted-foreground mb-0.5">Notes</p>
                 <p className="font-medium text-foreground whitespace-pre-wrap">{moreInfoItem.notes || "—"}</p>
               </div>
             </div>

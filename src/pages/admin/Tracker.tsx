@@ -49,6 +49,17 @@ export function AdminTracker({
   const [filterService, setFilterService] = useState("");
   const [filterDate, setFilterDate] = useState("");
 
+  const [copiedKey, setCopiedKey] = useState<string | null>(null);
+
+  const handleCopyEmail = (email: string, key: string, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    navigator.clipboard.writeText(email);
+    setCopiedKey(key);
+    setTimeout(() => {
+      setCopiedKey(prev => (prev === key ? null : prev));
+    }, 1500);
+  };
+
   useEffect(() => {
     accountsService.fetchResidentMakers().then(setMakers);
   }, []);
@@ -248,10 +259,23 @@ export function AdminTracker({
             {filteredCommissions.map((c, index) => {
               const isEditing = editId === c.id;
               const driveLink = resolveDriveLink(c);
+              const rowKey = `${c.id}-${index}`;
               return (
-                <tr key={`${c.id}-${index}`} className="border-b border-muted hover:bg-muted/50 transition">
+                <tr key={rowKey} className="border-b border-muted hover:bg-muted/50 transition">
                   <td className="px-3 py-2.5 font-mono text-xs text-muted-foreground">{c.id}</td>
-                  <td className="px-3 py-2.5 font-medium text-foreground whitespace-nowrap">{c.client}</td>
+                  <td className="px-3 py-2.5">
+                    <div className="font-medium text-foreground whitespace-nowrap">{c.client}</div>
+                    {c.clientEmail && (
+                      <button
+                        type="button"
+                        onClick={(e) => handleCopyEmail(c.clientEmail!, rowKey, e)}
+                        className="text-xs text-blue-500 hover:text-blue-600 underline font-normal break-all font-mono block mt-0.5 text-left cursor-pointer"
+                        title="Click to copy email address"
+                      >
+                        {copiedKey === rowKey ? "Copied!" : c.clientEmail}
+                      </button>
+                    )}
+                  </td>
                   <td className="px-3 py-2.5 text-muted-foreground whitespace-nowrap">{c.service}</td>
 
                   {/*Drive Link*/}
@@ -406,6 +430,21 @@ export function AdminTracker({
 
             <div className="grid grid-cols-2 gap-4 text-sm">
               <div>
+                <p className="text-xs text-muted-foreground mb-0.5">Email Address</p>
+                {moreInfoItem.clientEmail ? (
+                  <button
+                    type="button"
+                    onClick={(e) => handleCopyEmail(moreInfoItem.clientEmail!, `modal-${moreInfoItem.id}`, e)}
+                    className="font-medium text-blue-500 hover:text-blue-600 underline break-all font-mono text-left cursor-pointer block"
+                    title="Click to copy email address"
+                  >
+                    {copiedKey === `modal-${moreInfoItem.id}` ? "Copied to clipboard!" : moreInfoItem.clientEmail}
+                  </button>
+                ) : (
+                  <p className="font-medium text-foreground">—</p>
+                )}
+              </div>
+              <div>
                 <p className="text-xs text-muted-foreground mb-0.5">Contact Number</p>
                 <p className="font-medium text-foreground">{moreInfoItem.clientContactNumber || "—"}</p>
               </div>
@@ -501,7 +540,7 @@ export function AdminTracker({
               </div>
 
               <div className="col-span-2">
-                <p className="text-xs text-muted-foreground mb-0.5">Additional Notes</p>
+                <p className="text-xs text-muted-foreground mb-0.5">Notes</p>
                 <p className="font-medium text-foreground whitespace-pre-wrap">{moreInfoItem.notes || "—"}</p>
               </div>
             </div>
