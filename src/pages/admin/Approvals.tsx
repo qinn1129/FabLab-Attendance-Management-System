@@ -287,10 +287,14 @@ export function AdminApprovals({
                     <button
                       type="button"
                       onClick={(e) => handleCopyEmail(item.clientEmail!, item.id, e)}
-                      className="text-sm font-medium text-blue-500 hover:text-blue-600 underline break-all font-mono block text-left cursor-pointer"
+                      className="text-sm font-mono text-card-foreground hover:text-muted-foreground break-all block text-left cursor-pointer transition"
                       title="Click to copy email address"
                     >
-                      {copiedKey === item.id ? "Copied!" : item.clientEmail}
+                      {copiedKey === item.id ? (
+                        <span className="text-emerald-500 font-medium">Copied!</span>
+                      ) : (
+                        item.clientEmail
+                      )}
                     </button>
                   ) : (
                     <p className="text-sm text-muted-foreground/50 italic">—</p>

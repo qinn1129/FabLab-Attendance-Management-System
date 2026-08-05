@@ -269,10 +269,14 @@ export function AdminTracker({
                       <button
                         type="button"
                         onClick={(e) => handleCopyEmail(c.clientEmail!, rowKey, e)}
-                        className="text-xs text-blue-500 hover:text-blue-600 underline font-normal break-all font-mono block mt-0.5 text-left cursor-pointer"
+                        className="text-xs text-muted-foreground hover:text-foreground font-mono block mt-0.5 text-left cursor-pointer break-all transition"
                         title="Click to copy email address"
                       >
-                        {copiedKey === rowKey ? "Copied!" : c.clientEmail}
+                        {copiedKey === rowKey ? (
+                          <span className="text-emerald-500 font-medium">Copied!</span>
+                        ) : (
+                          c.clientEmail
+                        )}
                       </button>
                     )}
                   </td>
@@ -435,10 +439,14 @@ export function AdminTracker({
                   <button
                     type="button"
                     onClick={(e) => handleCopyEmail(moreInfoItem.clientEmail!, `modal-${moreInfoItem.id}`, e)}
-                    className="font-medium text-blue-500 hover:text-blue-600 underline break-all font-mono text-left cursor-pointer block"
+                    className="font-medium text-foreground hover:text-muted-foreground break-all font-mono text-left cursor-pointer block transition"
                     title="Click to copy email address"
                   >
-                    {copiedKey === `modal-${moreInfoItem.id}` ? "Copied to clipboard!" : moreInfoItem.clientEmail}
+                    {copiedKey === `modal-${moreInfoItem.id}` ? (
+                      <span className="text-emerald-500 font-medium">Copied to clipboard!</span>
+                    ) : (
+                      moreInfoItem.clientEmail
+                    )}
                   </button>
                 ) : (
                   <p className="font-medium text-foreground">—</p>
