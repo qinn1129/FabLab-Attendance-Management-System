@@ -1,5 +1,6 @@
 import React from "react";
 import { ChevronRight } from "lucide-react";
+import asset1 from "../../assets/asset1.jpg";
 
 /**
  * Hero section for the Client landing page.
@@ -12,12 +13,7 @@ export function HeroSection({ onStart }: { onStart: () => void }) {
   return (
     <section className="relative h-[520px] flex items-center overflow-hidden">
       <div className="absolute inset-0 bg-gray-900">
-        {/*THIS IMAGE IS YET TO BE REPLACED*/}
-        <img
-          src="https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?w=1400&h=600&fit=crop&auto=format"
-          alt="FabLab 3D printing workspace"
-          className="w-full h-full object-cover opacity-40"
-        />
+        <img src={asset1} alt="FabLab 3D printing workspace" className="w-full h-full object-cover opacity-40" />
         <div className="absolute inset-0 bg-gradient-to-r from-violet-950/80 to-transparent" />
       </div>
       <div className="relative z-10 max-w-2xl px-10">

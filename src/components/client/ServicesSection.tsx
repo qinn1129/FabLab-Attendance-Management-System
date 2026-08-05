@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from "react";
 import { servicesService, type ServiceOffering } from "../../services/servicesService";
 import { getServiceIcon } from "../../constants/serviceIcons";
+import asset2 from "../../assets/asset2.jpg";
+import asset3 from "../../assets/asset3.jpg";
+import asset4 from "../../assets/asset4.jpeg";
 
 /**
  * Services overview section for the Client landing page.
@@ -40,19 +43,15 @@ export function ServicesSection() {
               <div key={i} className="bg-white rounded-xl p-5 border border-gray-100 animate-pulse h-32" />
             ))
           ) : (
-            services.map(s => {
+            services.map((s, i) => {
               const Icon = getServiceIcon(s.icon);
+              const serviceImages = [asset2, asset3, asset4];
+              const imgSrc = serviceImages[i % serviceImages.length];
               return (
                 <div key={s.id} className="bg-white rounded-xl p-5 border border-gray-100 hover:border-violet-200 hover:shadow-sm transition">
-                  {s.image ? (
-                    <div className="w-full h-20 rounded-lg overflow-hidden mb-3 bg-gray-100">
-                      <img src={s.image} alt={s.title} className="w-full h-full object-cover" />
-                    </div>
-                  ) : (
-                    <div className="w-10 h-10 rounded-lg bg-violet-50 flex items-center justify-center mb-3">
-                      <Icon className="w-5 h-5 text-violet-600" />
-                    </div>
-                  )}
+                  <div className="w-full h-20 rounded-lg overflow-hidden mb-3 bg-gray-100">
+                    <img src={imgSrc} alt={s.title} className="w-full h-full object-cover" />
+                  </div>
                   <h3 className="font-semibold text-gray-900 text-sm mb-1">{s.title}</h3>
                   <p className="text-gray-500 text-xs leading-relaxed">{s.desc}</p>
                 </div>
