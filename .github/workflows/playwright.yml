@@ -20,7 +20,11 @@ jobs:
     - name: Run Playwright tests
       run: npx playwright test
       env:
-        VITE_GOOGLE_SCRIPT_URL: https://script.google.com/macros/s/playwright-test/exec
+        # The frontend just needs some non-empty value here so
+        # isApiConfigured() returns true — every API call in these tests is
+        # intercepted by mockApi() in tests/client.spec.ts, so nothing ever
+        # actually reaches this URL.
+        VITE_API_URL: http://127.0.0.1:4000
         VITE_WEBAPP_SECRET: playwright-test-secret
     - uses: actions/upload-artifact@v4
       if: ${{ !cancelled() }}

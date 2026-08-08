@@ -1,3 +1,6 @@
+import { cachedFetch, invalidateCache } from "../lib/requestCache";
+import { fetchSheet, addRow, updateRow, deleteRow, isApiConfigured, ApiError } from "../lib/apiClient";
+
 export interface Machine {
   id: string;
   "Machine Model": string;
@@ -77,50 +80,42 @@ export interface Commission {
 
 const LOCAL_STORAGE_KEY = "fablab_commissions_v2";
 
-// Helper to check if Google Apps Script URL is set
-const getScriptUrl = (): string | null => {
-  const url = import.meta.env.VITE_GOOGLE_SCRIPT_URL;
-  return url && url.trim() !== "" ? url.trim() : null;
-};
-
 export const sheetsService = {
   /**
-   * Fetches all commissions from Google Sheets or localStorage fallback.
+   * Fetches all commissions from the API, or localStorage fallback if
+   * VITE_API_URL isn't configured. Cached briefly (3s) since this is the
+   * single most-requested collection in the app — App.tsx, Approvals,
+   * Tracker, Assignment, and both Maker/Admin dashboards all read from it.
    */
   async fetchCommissions(): Promise<Commission[]> {
-    const url = getScriptUrl();
-    if (!url) {
-      console.log(
-        "[sheetsService] No VITE_GOOGLE_SCRIPT_URL found. Returning no commissions.",
-      );
+    if (!isApiConfigured()) {
+      console.log("[sheetsService] No VITE_API_URL found. Returning no commissions.");
       return [] as Commission[];
     }
 
-    try {
-      const secret = import.meta.env.VITE_WEBAPP_SECRET || "";
-      const fetchUrl = `${url}${url.includes("?") ? "&" : "?"}secret=${encodeURIComponent(secret)}&sheet=commission_reqs`;
-      const response = await fetch(fetchUrl);
-      if (!response.ok)
-        throw new Error(`HTTP error! status: ${response.status}`);
-      const data = await response.json();
-      if (data.error) throw new Error(data.error);
-
-      // Parse numerical weight and normalize values
-      return data.map((item: any) => ({
-        ...item,
-        weight: Number(item.weight) || 0,
-        rm: item.rm || null,
-        printer: item.printer || null,
-        deadline: item.deadline || null,
-        problems: item.problems || null,
-      }));
-    } catch (error) {
-      console.error(
-        "[sheetsService] Failed to fetch from Google Sheets. Returning no commissions.",
-        error,
-      );
-      return [] as Commission[];
-    }
+    return cachedFetch(
+      "commissions",
+      async () => {
+        try {
+          const data = await fetchSheet<any>("commission_reqs");
+          return data.map((item) => ({
+            ...item,
+            weight: Number(item.weight) || 0,
+            rm: item.rm || null,
+            printer: item.printer || null,
+            deadline: item.deadline || null,
+            problems: item.problems || null,
+          })) as Commission[];
+        } catch (error) {
+          console.error(
+            "[sheetsService] Failed to fetch commissions from the API. Returning no commissions.",
+            error,
+          );
+          return [] as Commission[];
+        }
+      },
+      3000,
+    );
   },
 
   /**
@@ -142,11 +137,8 @@ export const sheetsService = {
       problems: null,
     };
 
-    const url = getScriptUrl();
-    if (!url) {
-      console.log(
-        "[sheetsService] No VITE_GOOGLE_SCRIPT_URL found. Saving to localStorage.",
-      );
+    if (!isApiConfigured()) {
+      console.log("[sheetsService] No VITE_API_URL found. Saving to localStorage.");
       let data = [];
       const existing = localStorage.getItem(LOCAL_STORAGE_KEY);
       if (existing) data = JSON.parse(existing);
@@ -156,23 +148,12 @@ export const sheetsService = {
     }
 
     try {
-      const secret = import.meta.env.VITE_WEBAPP_SECRET || "";
-      const fetchUrl = `${url}${url.includes("?") ? "&" : "?"}secret=${encodeURIComponent(secret)}&sheet=commission_reqs`;
-      await fetch(fetchUrl, {
-        method: "POST",
-        mode: "no-cors", // Crucial for cross-origin script redirects
-        headers: { "Content-Type": "text/plain;charset=utf-8" },
-        body: JSON.stringify({
-          secret,
-          sheet: "commission_reqs",
-          action: "add",
-          data: newCommission,
-        }),
-      });
+      await addRow("commission_reqs", newCommission as unknown as Record<string, unknown>);
+      invalidateCache("commissions");
       return newCommission;
     } catch (error) {
       console.error(
-        "[sheetsService] Failed to add to Google Sheets. Saving to localStorage.",
+        "[sheetsService] Failed to add commission via the API. Saving to localStorage.",
         error,
       );
       let data = [];
@@ -191,11 +172,8 @@ export const sheetsService = {
     id: string,
     updates: Partial<Commission>,
   ): Promise<void> {
-    const url = getScriptUrl();
-    if (!url) {
-      console.log(
-        "[sheetsService] No VITE_GOOGLE_SCRIPT_URL found. Using localStorage.",
-      );
+    if (!isApiConfigured()) {
+      console.log("[sheetsService] No VITE_API_URL found. Using localStorage.");
       let data = [];
       const existing = localStorage.getItem(LOCAL_STORAGE_KEY);
       if (existing) data = JSON.parse(existing);
@@ -207,23 +185,11 @@ export const sheetsService = {
       return;
     }
     try {
-      const secret = import.meta.env.VITE_WEBAPP_SECRET || "";
-      const fetchUrl = `${url}${url.includes("?") ? "&" : "?"}secret=${encodeURIComponent(secret)}&sheet=commission_reqs`;
-      await fetch(fetchUrl, {
-        method: "POST",
-        mode: "no-cors",
-        headers: { "Content-Type": "text/plain;charset=utf-8" },
-        body: JSON.stringify({
-          secret,
-          sheet: "commission_reqs",
-          action: "update",
-          id,
-          data: updates,
-        }),
-      });
+      await updateRow("commission_reqs", id, updates as Record<string, unknown>);
+      invalidateCache("commissions");
     } catch (error) {
       console.error(
-        "[sheetsService] Failed to update Google Sheets. Saving to localStorage.",
+        "[sheetsService] Failed to update commission via the API. Saving to localStorage.",
         error,
       );
       let data = [];
@@ -242,32 +208,28 @@ export const sheetsService = {
    * Fetches all weekly schedules.
    */
   async fetchWeeklySchedules(): Promise<WeeklySchedule[]> {
-    const url = getScriptUrl();
-    if (!url) {
-      console.log(
-        "[sheetsService] No VITE_GOOGLE_SCRIPT_URL found. Using localStorage fallback for weekly schedules.",
-      );
+    if (!isApiConfigured()) {
+      console.log("[sheetsService] No VITE_API_URL found. Using localStorage fallback for weekly schedules.");
       const existing = localStorage.getItem("fablab_weekly_schedules_v1");
       return existing ? JSON.parse(existing) : [];
     }
 
-    try {
-      const secret = import.meta.env.VITE_WEBAPP_SECRET || "";
-      const fetchUrl = `${url}${url.includes("?") ? "&" : "?"}secret=${encodeURIComponent(secret)}&sheet=weeklyScheds`;
-      const response = await fetch(fetchUrl);
-      if (!response.ok)
-        throw new Error(`HTTP error! status: ${response.status}`);
-      const data = await response.json();
-      if (data.error) throw new Error(data.error);
-      return data as WeeklySchedule[];
-    } catch (error) {
-      console.error(
-        "[sheetsService] Failed to fetch weekly schedules from Google Sheets. Falling back to localStorage.",
-        error,
-      );
-      const existing = localStorage.getItem("fablab_weekly_schedules_v1");
-      return existing ? JSON.parse(existing) : [];
-    }
+    return cachedFetch(
+      "weeklyScheds",
+      async () => {
+        try {
+          return await fetchSheet<WeeklySchedule>("weeklyScheds");
+        } catch (error) {
+          console.error(
+            "[sheetsService] Failed to fetch weekly schedules from the API. Falling back to localStorage.",
+            error,
+          );
+          const existing = localStorage.getItem("fablab_weekly_schedules_v1");
+          return existing ? JSON.parse(existing) : [];
+        }
+      },
+      5000,
+    );
   },
 
   /**
@@ -278,10 +240,9 @@ export const sheetsService = {
     day: string,
     timeString: string,
   ): Promise<void> {
-    const url = getScriptUrl();
     const updates = { [day]: timeString };
 
-    if (!url) {
+    if (!isApiConfigured()) {
       const existing = localStorage.getItem("fablab_weekly_schedules_v1");
       const scheds: WeeklySchedule[] = existing ? JSON.parse(existing) : [];
       const idx = scheds.findIndex((s) => s.resident_ID === residentId);
@@ -300,27 +261,12 @@ export const sheetsService = {
           ...updates,
         });
       }
-      localStorage.setItem(
-        "fablab_weekly_schedules_v1",
-        JSON.stringify(scheds),
-      );
+      localStorage.setItem("fablab_weekly_schedules_v1", JSON.stringify(scheds));
       return;
     }
     try {
-      const secret = import.meta.env.VITE_WEBAPP_SECRET || "";
-      const fetchUrl = `${url}${url.includes("?") ? "&" : "?"}secret=${encodeURIComponent(secret)}&sheet=weeklyScheds`;
-      await fetch(fetchUrl, {
-        method: "POST",
-        mode: "no-cors",
-        headers: { "Content-Type": "text/plain;charset=utf-8" },
-        body: JSON.stringify({
-          secret,
-          sheet: "weeklyScheds",
-          action: "update",
-          id: residentId,
-          data: updates,
-        }),
-      });
+      await updateRow("weeklyScheds", residentId, updates);
+      invalidateCache("weeklyScheds");
 
       // Also update local storage cache
       const existing = localStorage.getItem("fablab_weekly_schedules_v1");
@@ -341,13 +287,10 @@ export const sheetsService = {
           ...updates,
         });
       }
-      localStorage.setItem(
-        "fablab_weekly_schedules_v1",
-        JSON.stringify(scheds),
-      );
+      localStorage.setItem("fablab_weekly_schedules_v1", JSON.stringify(scheds));
     } catch (error) {
       console.error(
-        "[sheetsService] Failed to save weekly schedule to Google Sheets. Saving to localStorage.",
+        "[sheetsService] Failed to save weekly schedule via the API. Saving to localStorage.",
         error,
       );
       const existing = localStorage.getItem("fablab_weekly_schedules_v1");
@@ -368,10 +311,7 @@ export const sheetsService = {
           ...updates,
         });
       }
-      localStorage.setItem(
-        "fablab_weekly_schedules_v1",
-        JSON.stringify(scheds),
-      );
+      localStorage.setItem("fablab_weekly_schedules_v1", JSON.stringify(scheds));
     }
   },
 
@@ -379,43 +319,41 @@ export const sheetsService = {
    * Fetches all attendance logs.
    */
   async fetchAttendanceLogs(): Promise<AttendanceLog[]> {
-    const url = getScriptUrl();
-    if (!url) {
-      console.log(
-        "[sheetsService] No VITE_GOOGLE_SCRIPT_URL found. Using localStorage fallback for attendance logs.",
-      );
+    if (!isApiConfigured()) {
+      console.log("[sheetsService] No VITE_API_URL found. Using localStorage fallback for attendance logs.");
       const existing = localStorage.getItem("fablab_attendance_logs_v1");
       return existing ? JSON.parse(existing) : [];
     }
 
-    try {
-      const secret = import.meta.env.VITE_WEBAPP_SECRET || "";
-      const fetchUrl = `${url}${url.includes("?") ? "&" : "?"}secret=${encodeURIComponent(secret)}&sheet=attendanceLogs`;
-      const response = await fetch(fetchUrl);
-      if (!response.ok)
-        throw new Error(`HTTP error! status: ${response.status}`);
-      const data = await response.json();
-      if (data.error) throw new Error(data.error);
-      return data.map((item: any) => ({
-        ...item,
-        total_hours: Number(item.total_hours) || 0,
-      })) as AttendanceLog[];
-    } catch (error) {
-      console.error(
-        "[sheetsService] Failed to fetch attendance logs from Google Sheets. Falling back to localStorage.",
-        error,
-      );
-      const existing = localStorage.getItem("fablab_attendance_logs_v1");
-      return existing ? JSON.parse(existing) : [];
-    }
+    return cachedFetch(
+      "attendanceLogs",
+      async () => {
+        try {
+          const data = await fetchSheet<any>("attendanceLogs");
+          return data.map((item) => ({
+            ...item,
+            total_hours: Number(item.total_hours) || 0,
+          })) as AttendanceLog[];
+        } catch (error) {
+          console.error(
+            "[sheetsService] Failed to fetch attendance logs from the API. Falling back to localStorage.",
+            error,
+          );
+          const existing = localStorage.getItem("fablab_attendance_logs_v1");
+          return existing ? JSON.parse(existing) : [];
+        }
+      },
+      // Kept short since Attendance.tsx relies on this to detect the
+      // currently-active clock-in session.
+      2000,
+    );
   },
 
   /**
    * Adds a new attendance log.
    */
   async addAttendanceLog(log: AttendanceLog): Promise<AttendanceLog> {
-    const url = getScriptUrl();
-    if (!url) {
+    if (!isApiConfigured()) {
       const existing = localStorage.getItem("fablab_attendance_logs_v1");
       const logs: AttendanceLog[] = existing ? JSON.parse(existing) : [];
       logs.push(log);
@@ -424,21 +362,9 @@ export const sheetsService = {
     }
 
     try {
-      const secret = import.meta.env.VITE_WEBAPP_SECRET || "";
-      const fetchUrl = `${url}${url.includes("?") ? "&" : "?"}secret=${encodeURIComponent(secret)}&sheet=attendanceLogs`;
-      await fetch(fetchUrl, {
-        method: "POST",
-        mode: "no-cors",
-        headers: { "Content-Type": "text/plain;charset=utf-8" },
-        body: JSON.stringify({
-          secret,
-          sheet: "attendanceLogs",
-          action: "add",
-          data: log,
-        }),
-      });
+      await addRow("attendanceLogs", log as unknown as Record<string, unknown>);
+      invalidateCache("attendanceLogs");
 
-      // Update local storage too so offline sync / fallback is populated
       const existing = localStorage.getItem("fablab_attendance_logs_v1");
       const logs: AttendanceLog[] = existing ? JSON.parse(existing) : [];
       logs.push(log);
@@ -446,7 +372,7 @@ export const sheetsService = {
       return log;
     } catch (error) {
       console.error(
-        "[sheetsService] Failed to add attendance log to Google Sheets. Saving to localStorage.",
+        "[sheetsService] Failed to add attendance log via the API. Saving to localStorage.",
         error,
       );
       const existing = localStorage.getItem("fablab_attendance_logs_v1");
@@ -464,8 +390,7 @@ export const sheetsService = {
     id: string,
     updates: Partial<AttendanceLog>,
   ): Promise<void> {
-    const url = getScriptUrl();
-    if (!url) {
+    if (!isApiConfigured()) {
       const existing = localStorage.getItem("fablab_attendance_logs_v1");
       const logs: AttendanceLog[] = existing ? JSON.parse(existing) : [];
       const idx = logs.findIndex((l) => l.id === id);
@@ -477,22 +402,9 @@ export const sheetsService = {
     }
 
     try {
-      const secret = import.meta.env.VITE_WEBAPP_SECRET || "";
-      const fetchUrl = `${url}${url.includes("?") ? "&" : "?"}secret=${encodeURIComponent(secret)}&sheet=attendanceLogs`;
-      await fetch(fetchUrl, {
-        method: "POST",
-        mode: "no-cors",
-        headers: { "Content-Type": "text/plain;charset=utf-8" },
-        body: JSON.stringify({
-          secret,
-          sheet: "attendanceLogs",
-          action: "update",
-          id,
-          data: updates,
-        }),
-      });
+      await updateRow("attendanceLogs", id, updates as Record<string, unknown>);
+      invalidateCache("attendanceLogs");
 
-      // Also update local storage cache
       const existing = localStorage.getItem("fablab_attendance_logs_v1");
       const logs: AttendanceLog[] = existing ? JSON.parse(existing) : [];
       const idx = logs.findIndex((l) => l.id === id);
@@ -502,7 +414,7 @@ export const sheetsService = {
       }
     } catch (error) {
       console.error(
-        "[sheetsService] Failed to update attendance log in Google Sheets. Saving to localStorage.",
+        "[sheetsService] Failed to update attendance log via the API. Saving to localStorage.",
         error,
       );
       const existing = localStorage.getItem("fablab_attendance_logs_v1");
@@ -516,119 +428,79 @@ export const sheetsService = {
   },
 
   /**
-   * Fetches all machines from Google Sheets or localStorage fallback.
+   * Fetches all machines. Given machines are effectively static config
+   * data (no add/update/delete flow exists for them anywhere in the app),
+   * this uses a longer cache TTL.
    */
   async fetchMachines(): Promise<Machine[]> {
-    const url = getScriptUrl();
-    if (!url) {
-      console.log(
-        "[sheetsService] No VITE_GOOGLE_SCRIPT_URL found. Using localStorage fallback for machines.",
-      );
+    const seeded: Machine[] = [
+      { id: "MAC-001", "Machine Model": "Ender 3 Pro #1", "Placement / Location Notes": "3D Printing Area - Table A" },
+      { id: "MAC-002", "Machine Model": "Bambu Lab P1S", "Placement / Location Notes": "3D Printing Area - Shelf A" },
+      { id: "MAC-003", "Machine Model": "Ender 3 Pro #2", "Placement / Location Notes": "3D Printing Area - Table A" },
+      { id: "MAC-004", "Machine Model": "Bambu Lab A1", "Placement / Location Notes": "3D Printing Area - Table B" },
+    ];
+
+    if (!isApiConfigured()) {
+      console.log("[sheetsService] No VITE_API_URL found. Using localStorage fallback for machines.");
       const existing = localStorage.getItem("fablab_machines_v1");
-      if (existing) {
-        return JSON.parse(existing);
-      }
-      const seeded: Machine[] = [
-        {
-          id: "MAC-001",
-          "Machine Model": "Ender 3 Pro #1",
-          "Placement / Location Notes": "3D Printing Area - Table A",
-        },
-        {
-          id: "MAC-002",
-          "Machine Model": "Bambu Lab P1S",
-          "Placement / Location Notes": "3D Printing Area - Shelf A",
-        },
-        {
-          id: "MAC-003",
-          "Machine Model": "Ender 3 Pro #2",
-          "Placement / Location Notes": "3D Printing Area - Table A",
-        },
-        {
-          id: "MAC-004",
-          "Machine Model": "Bambu Lab A1",
-          "Placement / Location Notes": "3D Printing Area - Table B",
-        },
-      ];
+      if (existing) return JSON.parse(existing);
       localStorage.setItem("fablab_machines_v1", JSON.stringify(seeded));
       return seeded;
     }
 
-    try {
-      const secret = import.meta.env.VITE_WEBAPP_SECRET || "";
-      const fetchUrl = `${url}${url.includes("?") ? "&" : "?"}secret=${encodeURIComponent(secret)}&sheet=machines`;
-      const response = await fetch(fetchUrl);
-      if (!response.ok)
-        throw new Error(`HTTP error! status: ${response.status}`);
-      const data = await response.json();
-      if (data.error) throw new Error(data.error);
-      return data as Machine[];
-    } catch (error) {
-      console.error(
-        "[sheetsService] Failed to fetch machines from Google Sheets. Falling back to localStorage.",
-        error,
-      );
-      const existing = localStorage.getItem("fablab_machines_v1");
-      if (existing) {
-        return JSON.parse(existing);
-      }
-      const seeded: Machine[] = [
-        {
-          id: "MAC-001",
-          "Machine Model": "Ender 3 Pro #1",
-          "Placement / Location Notes": "3D Printing Area - Table A",
-        },
-        {
-          id: "MAC-002",
-          "Machine Model": "Bambu Lab P1S",
-          "Placement / Location Notes": "3D Printing Area - Shelf A",
-        },
-        {
-          id: "MAC-003",
-          "Machine Model": "Ender 3 Pro #2",
-          "Placement / Location Notes": "3D Printing Area - Table A",
-        },
-        {
-          id: "MAC-004",
-          "Machine Model": "Bambu Lab A1",
-          "Placement / Location Notes": "3D Printing Area - Table B",
-        },
-      ];
-      localStorage.setItem("fablab_machines_v1", JSON.stringify(seeded));
-      return seeded;
-    }
+    return cachedFetch(
+      "machines",
+      async () => {
+        try {
+          const data = await fetchSheet<Machine>("machines");
+          if (data.length === 0) {
+            // Mirrors the old behavior of seeding default machines when the sheet is empty.
+            return seeded;
+          }
+          return data;
+        } catch (error) {
+          console.error(
+            "[sheetsService] Failed to fetch machines from the API. Falling back to localStorage.",
+            error,
+          );
+          const existing = localStorage.getItem("fablab_machines_v1");
+          if (existing) return JSON.parse(existing);
+          localStorage.setItem("fablab_machines_v1", JSON.stringify(seeded));
+          return seeded;
+        }
+      },
+      15000,
+    );
   },
 
   /**
    * Fetches all machine reservations.
    */
   async fetchReservations(): Promise<MachineReservation[]> {
-    const url = getScriptUrl();
-    if (!url) {
-      console.log(
-        "[sheetsService] No VITE_GOOGLE_SCRIPT_URL found. Using localStorage fallback for reservations.",
-      );
+    if (!isApiConfigured()) {
+      console.log("[sheetsService] No VITE_API_URL found. Using localStorage fallback for reservations.");
       const existing = localStorage.getItem("fablab_reservations_v1");
       return existing ? JSON.parse(existing) : [];
     }
 
-    try {
-      const secret = import.meta.env.VITE_WEBAPP_SECRET || "";
-      const fetchUrl = `${url}${url.includes("?") ? "&" : "?"}secret=${encodeURIComponent(secret)}&sheet=machine_reservations`;
-      const response = await fetch(fetchUrl);
-      if (!response.ok)
-        throw new Error(`HTTP error! status: ${response.status}`);
-      const data = await response.json();
-      if (data.error) throw new Error(data.error);
-      return data as MachineReservation[];
-    } catch (error) {
-      console.error(
-        "[sheetsService] Failed to fetch reservations from Google Sheets. Falling back to localStorage.",
-        error,
-      );
-      const existing = localStorage.getItem("fablab_reservations_v1");
-      return existing ? JSON.parse(existing) : [];
-    }
+    return cachedFetch(
+      "reservations",
+      async () => {
+        try {
+          return await fetchSheet<MachineReservation>("machine_reservations");
+        } catch (error) {
+          console.error(
+            "[sheetsService] Failed to fetch reservations from the API. Falling back to localStorage.",
+            error,
+          );
+          const existing = localStorage.getItem("fablab_reservations_v1");
+          return existing ? JSON.parse(existing) : [];
+        }
+      },
+      // Short TTL — the Reservations calendar is drag/drop interactive and
+      // multiple Resident Makers may be booking the same machine.
+      2000,
+    );
   },
 
   /**
@@ -637,8 +509,7 @@ export const sheetsService = {
   async addReservation(
     reservation: MachineReservation,
   ): Promise<MachineReservation> {
-    const url = getScriptUrl();
-    if (!url) {
+    if (!isApiConfigured()) {
       const existing = localStorage.getItem("fablab_reservations_v1");
       const list: MachineReservation[] = existing ? JSON.parse(existing) : [];
       list.push(reservation);
@@ -647,19 +518,8 @@ export const sheetsService = {
     }
 
     try {
-      const secret = import.meta.env.VITE_WEBAPP_SECRET || "";
-      const fetchUrl = `${url}${url.includes("?") ? "&" : "?"}secret=${encodeURIComponent(secret)}&sheet=machine_reservations`;
-      await fetch(fetchUrl, {
-        method: "POST",
-        mode: "no-cors",
-        headers: { "Content-Type": "text/plain;charset=utf-8" },
-        body: JSON.stringify({
-          secret,
-          sheet: "machine_reservations",
-          action: "add",
-          data: reservation,
-        }),
-      });
+      await addRow("machine_reservations", reservation as unknown as Record<string, unknown>);
+      invalidateCache("reservations");
 
       const existing = localStorage.getItem("fablab_reservations_v1");
       const list: MachineReservation[] = existing ? JSON.parse(existing) : [];
@@ -668,7 +528,7 @@ export const sheetsService = {
       return reservation;
     } catch (error) {
       console.error(
-        "[sheetsService] Failed to add reservation to Google Sheets. Saving to localStorage.",
+        "[sheetsService] Failed to add reservation via the API. Saving to localStorage.",
         error,
       );
       const existing = localStorage.getItem("fablab_reservations_v1");
@@ -683,8 +543,7 @@ export const sheetsService = {
    * Cancels/deletes a reservation.
    */
   async deleteReservation(reservationId: string): Promise<void> {
-    const url = getScriptUrl();
-    if (!url) {
+    if (!isApiConfigured()) {
       const existing = localStorage.getItem("fablab_reservations_v1");
       const list: MachineReservation[] = existing ? JSON.parse(existing) : [];
       const filtered = list.filter((r) => r.reservation_id !== reservationId);
@@ -693,19 +552,8 @@ export const sheetsService = {
     }
 
     try {
-      const secret = import.meta.env.VITE_WEBAPP_SECRET || "";
-      const fetchUrl = `${url}${url.includes("?") ? "&" : "?"}secret=${encodeURIComponent(secret)}&sheet=machine_reservations`;
-      await fetch(fetchUrl, {
-        method: "POST",
-        mode: "no-cors",
-        headers: { "Content-Type": "text/plain;charset=utf-8" },
-        body: JSON.stringify({
-          secret,
-          sheet: "machine_reservations",
-          action: "delete",
-          id: reservationId,
-        }),
-      });
+      await deleteRow("machine_reservations", reservationId);
+      invalidateCache("reservations");
 
       const existing = localStorage.getItem("fablab_reservations_v1");
       const list: MachineReservation[] = existing ? JSON.parse(existing) : [];
@@ -713,7 +561,7 @@ export const sheetsService = {
       localStorage.setItem("fablab_reservations_v1", JSON.stringify(filtered));
     } catch (error) {
       console.error(
-        "[sheetsService] Failed to delete reservation from Google Sheets. Saving to localStorage.",
+        "[sheetsService] Failed to delete reservation via the API. Saving to localStorage.",
         error,
       );
       const existing = localStorage.getItem("fablab_reservations_v1");
@@ -730,8 +578,7 @@ export const sheetsService = {
     reservationId: string,
     updates: Partial<MachineReservation>,
   ): Promise<void> {
-    const url = getScriptUrl();
-    if (!url) {
+    if (!isApiConfigured()) {
       const existing = localStorage.getItem("fablab_reservations_v1");
       const list: MachineReservation[] = existing ? JSON.parse(existing) : [];
       const idx = list.findIndex((r) => r.reservation_id === reservationId);
@@ -743,20 +590,8 @@ export const sheetsService = {
     }
 
     try {
-      const secret = import.meta.env.VITE_WEBAPP_SECRET || "";
-      const fetchUrl = `${url}${url.includes("?") ? "&" : "?"}secret=${encodeURIComponent(secret)}&sheet=machine_reservations`;
-      await fetch(fetchUrl, {
-        method: "POST",
-        mode: "no-cors",
-        headers: { "Content-Type": "text/plain;charset=utf-8" },
-        body: JSON.stringify({
-          secret,
-          sheet: "machine_reservations",
-          action: "update",
-          id: reservationId,
-          data: updates,
-        }),
-      });
+      await updateRow("machine_reservations", reservationId, updates as Record<string, unknown>);
+      invalidateCache("reservations");
 
       const existing = localStorage.getItem("fablab_reservations_v1");
       const list: MachineReservation[] = existing ? JSON.parse(existing) : [];
@@ -767,7 +602,7 @@ export const sheetsService = {
       }
     } catch (error) {
       console.error(
-        "[sheetsService] Failed to update reservation. Saving to localStorage.",
+        "[sheetsService] Failed to update reservation via the API. Saving to localStorage.",
         error,
       );
       const existing = localStorage.getItem("fablab_reservations_v1");
@@ -784,32 +619,28 @@ export const sheetsService = {
    * Fetches all attendance requests.
    */
   async fetchAttendanceRequests(): Promise<AttendanceRequest[]> {
-    const url = getScriptUrl();
-    if (!url) {
-      console.log(
-        "[sheetsService] No VITE_GOOGLE_SCRIPT_URL found. Using localStorage fallback for attendance requests.",
-      );
+    if (!isApiConfigured()) {
+      console.log("[sheetsService] No VITE_API_URL found. Using localStorage fallback for attendance requests.");
       const existing = localStorage.getItem("fablab_attendance_requests_v1");
       return existing ? JSON.parse(existing) : [];
     }
 
-    try {
-      const secret = import.meta.env.VITE_WEBAPP_SECRET || "";
-      const fetchUrl = `${url}${url.includes("?") ? "&" : "?"}secret=${encodeURIComponent(secret)}&sheet=attendance_requests`;
-      const response = await fetch(fetchUrl);
-      if (!response.ok)
-        throw new Error(`HTTP error! status: ${response.status}`);
-      const data = await response.json();
-      if (data.error) throw new Error(data.error);
-      return data as AttendanceRequest[];
-    } catch (error) {
-      console.error(
-        "[sheetsService] Failed to fetch attendance requests from Google Sheets. Falling back to localStorage.",
-        error,
-      );
-      const existing = localStorage.getItem("fablab_attendance_requests_v1");
-      return existing ? JSON.parse(existing) : [];
-    }
+    return cachedFetch(
+      "attendanceRequests",
+      async () => {
+        try {
+          return await fetchSheet<AttendanceRequest>("attendance_requests");
+        } catch (error) {
+          console.error(
+            "[sheetsService] Failed to fetch attendance requests from the API. Falling back to localStorage.",
+            error,
+          );
+          const existing = localStorage.getItem("fablab_attendance_requests_v1");
+          return existing ? JSON.parse(existing) : [];
+        }
+      },
+      5000,
+    );
   },
 
   /**
@@ -818,53 +649,32 @@ export const sheetsService = {
   async addAttendanceRequest(
     request: AttendanceRequest,
   ): Promise<AttendanceRequest> {
-    const url = getScriptUrl();
-    if (!url) {
+    if (!isApiConfigured()) {
       const existing = localStorage.getItem("fablab_attendance_requests_v1");
       const list: AttendanceRequest[] = existing ? JSON.parse(existing) : [];
       list.push(request);
-      localStorage.setItem(
-        "fablab_attendance_requests_v1",
-        JSON.stringify(list),
-      );
+      localStorage.setItem("fablab_attendance_requests_v1", JSON.stringify(list));
       return request;
     }
 
     try {
-      const secret = import.meta.env.VITE_WEBAPP_SECRET || "";
-      const fetchUrl = `${url}${url.includes("?") ? "&" : "?"}secret=${encodeURIComponent(secret)}&sheet=attendance_requests`;
-      await fetch(fetchUrl, {
-        method: "POST",
-        mode: "no-cors",
-        headers: { "Content-Type": "text/plain;charset=utf-8" },
-        body: JSON.stringify({
-          secret,
-          sheet: "attendance_requests",
-          action: "add",
-          data: request,
-        }),
-      });
+      await addRow("attendance_requests", request as unknown as Record<string, unknown>);
+      invalidateCache("attendanceRequests");
 
       const existing = localStorage.getItem("fablab_attendance_requests_v1");
       const list: AttendanceRequest[] = existing ? JSON.parse(existing) : [];
       list.push(request);
-      localStorage.setItem(
-        "fablab_attendance_requests_v1",
-        JSON.stringify(list),
-      );
+      localStorage.setItem("fablab_attendance_requests_v1", JSON.stringify(list));
       return request;
     } catch (error) {
       console.error(
-        "[sheetsService] Failed to add attendance request to Google Sheets. Saving to localStorage.",
+        "[sheetsService] Failed to add attendance request via the API. Saving to localStorage.",
         error,
       );
       const existing = localStorage.getItem("fablab_attendance_requests_v1");
       const list: AttendanceRequest[] = existing ? JSON.parse(existing) : [];
       list.push(request);
-      localStorage.setItem(
-        "fablab_attendance_requests_v1",
-        JSON.stringify(list),
-      );
+      localStorage.setItem("fablab_attendance_requests_v1", JSON.stringify(list));
       return request;
     }
   },
@@ -876,50 +686,31 @@ export const sheetsService = {
     requestId: string,
     updates: Partial<AttendanceRequest>,
   ): Promise<void> {
-    const url = getScriptUrl();
-    if (!url) {
+    if (!isApiConfigured()) {
       const existing = localStorage.getItem("fablab_attendance_requests_v1");
       const list: AttendanceRequest[] = existing ? JSON.parse(existing) : [];
       const idx = list.findIndex((r) => r.attendance_request_id === requestId);
       if (idx > -1) {
         list[idx] = { ...list[idx], ...updates };
-        localStorage.setItem(
-          "fablab_attendance_requests_v1",
-          JSON.stringify(list),
-        );
+        localStorage.setItem("fablab_attendance_requests_v1", JSON.stringify(list));
       }
       return;
     }
 
     try {
-      const secret = import.meta.env.VITE_WEBAPP_SECRET || "";
-      const fetchUrl = `${url}${url.includes("?") ? "&" : "?"}secret=${encodeURIComponent(secret)}&sheet=attendance_requests`;
-      await fetch(fetchUrl, {
-        method: "POST",
-        mode: "no-cors",
-        headers: { "Content-Type": "text/plain;charset=utf-8" },
-        body: JSON.stringify({
-          secret,
-          sheet: "attendance_requests",
-          action: "update",
-          id: requestId,
-          data: updates,
-        }),
-      });
+      await updateRow("attendance_requests", requestId, updates as Record<string, unknown>);
+      invalidateCache("attendanceRequests");
 
       const existing = localStorage.getItem("fablab_attendance_requests_v1");
       const list: AttendanceRequest[] = existing ? JSON.parse(existing) : [];
       const idx = list.findIndex((r) => r.attendance_request_id === requestId);
       if (idx > -1) {
         list[idx] = { ...list[idx], ...updates };
-        localStorage.setItem(
-          "fablab_attendance_requests_v1",
-          JSON.stringify(list),
-        );
+        localStorage.setItem("fablab_attendance_requests_v1", JSON.stringify(list));
       }
     } catch (error) {
       console.error(
-        "[sheetsService] Failed to update attendance request. Saving to localStorage.",
+        "[sheetsService] Failed to update attendance request via the API. Saving to localStorage.",
         error,
       );
       const existing = localStorage.getItem("fablab_attendance_requests_v1");
@@ -927,10 +718,7 @@ export const sheetsService = {
       const idx = list.findIndex((r) => r.attendance_request_id === requestId);
       if (idx > -1) {
         list[idx] = { ...list[idx], ...updates };
-        localStorage.setItem(
-          "fablab_attendance_requests_v1",
-          JSON.stringify(list),
-        );
+        localStorage.setItem("fablab_attendance_requests_v1", JSON.stringify(list));
       }
     }
   },

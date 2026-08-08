@@ -1,3 +1,6 @@
+import { cachedFetch, invalidateCache } from "../lib/requestCache";
+import { fetchSheet, addRow, updateRow, deleteRow, isApiConfigured } from "../lib/apiClient";
+
 export interface FAQ {
   id: string;
   q: string;
@@ -5,30 +8,25 @@ export interface FAQ {
   createdAt?: string;
 }
 
-const getScriptUrl = (): string | null => {
-  const url = import.meta.env.VITE_GOOGLE_SCRIPT_URL;
-  return url && url.trim() !== "" ? url.trim() : null;
-};
-
-const getSecret = () => import.meta.env.VITE_WEBAPP_SECRET || "";
-
 export const faqService = {
   async fetchFAQs(): Promise<FAQ[]> {
-    const url = getScriptUrl();
-    if (!url) {
-      console.warn("[faqService] VITE_GOOGLE_SCRIPT_URL is not set. Returning an empty list.");
+    if (!isApiConfigured()) {
+      console.warn("[faqService] VITE_API_URL is not set. Returning an empty list.");
       return [];
     }
-    try {
-      const fetchUrl = `${url}${url.includes("?") ? "&" : "?"}secret=${encodeURIComponent(getSecret())}&sheet=faqs`;
-      const response = await fetch(fetchUrl);
-      const data = await response.json();
-      if (data.error) throw new Error(data.error);
-      return (data as FAQ[]).sort((a, b) => (a.createdAt || "").localeCompare(b.createdAt || ""));
-    } catch (error) {
-      console.error("[faqService] Failed to fetch FAQs.", error);
-      return [];
-    }
+    return cachedFetch(
+      "faqs",
+      async () => {
+        try {
+          const data = await fetchSheet<FAQ>("faqs");
+          return data.sort((a, b) => (a.createdAt || "").localeCompare(b.createdAt || ""));
+        } catch (error) {
+          console.error("[faqService] Failed to fetch FAQs.", error);
+          return [];
+        }
+      },
+      8000,
+    );
   },
 
   async addFAQ(q: string, a: string): Promise<FAQ> {
@@ -38,20 +36,13 @@ export const faqService = {
       a,
       createdAt: new Date().toISOString(),
     };
-    const url = getScriptUrl();
-    if (!url) {
-      console.warn("[faqService] VITE_GOOGLE_SCRIPT_URL is not set. FAQ was not saved.");
+    if (!isApiConfigured()) {
+      console.warn("[faqService] VITE_API_URL is not set. FAQ was not saved.");
       return newFAQ;
     }
     try {
-      const secret = getSecret();
-      const fetchUrl = `${url}${url.includes("?") ? "&" : "?"}secret=${encodeURIComponent(secret)}&sheet=faqs`;
-      await fetch(fetchUrl, {
-        method: "POST",
-        mode: "no-cors",
-        headers: { "Content-Type": "text/plain;charset=utf-8" },
-        body: JSON.stringify({ secret, sheet: "faqs", action: "add", data: newFAQ }),
-      });
+      await addRow("faqs", newFAQ as unknown as Record<string, unknown>);
+      invalidateCache("faqs");
     } catch (error) {
       console.error("[faqService] Failed to save FAQ.", error);
     }
@@ -59,34 +50,20 @@ export const faqService = {
   },
 
   async updateFAQ(id: string, updates: Partial<FAQ>): Promise<void> {
-    const url = getScriptUrl();
-    if (!url) return;
+    if (!isApiConfigured()) return;
     try {
-      const secret = getSecret();
-      const fetchUrl = `${url}${url.includes("?") ? "&" : "?"}secret=${encodeURIComponent(secret)}&sheet=faqs`;
-      await fetch(fetchUrl, {
-        method: "POST",
-        mode: "no-cors",
-        headers: { "Content-Type": "text/plain;charset=utf-8" },
-        body: JSON.stringify({ secret, sheet: "faqs", action: "update", id, data: updates }),
-      });
+      await updateRow("faqs", id, updates as Record<string, unknown>);
+      invalidateCache("faqs");
     } catch (error) {
       console.error("[faqService] Failed to update FAQ.", error);
     }
   },
 
   async deleteFAQ(id: string): Promise<void> {
-    const url = getScriptUrl();
-    if (!url) return;
+    if (!isApiConfigured()) return;
     try {
-      const secret = getSecret();
-      const fetchUrl = `${url}${url.includes("?") ? "&" : "?"}secret=${encodeURIComponent(secret)}&sheet=faqs`;
-      await fetch(fetchUrl, {
-        method: "POST",
-        mode: "no-cors",
-        headers: { "Content-Type": "text/plain;charset=utf-8" },
-        body: JSON.stringify({ secret, sheet: "faqs", action: "delete", id }),
-      });
+      await deleteRow("faqs", id);
+      invalidateCache("faqs");
     } catch (error) {
       console.error("[faqService] Failed to delete FAQ.", error);
     }

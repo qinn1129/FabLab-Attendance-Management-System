@@ -1,3 +1,6 @@
+import { cachedFetch, invalidateCache } from "../lib/requestCache";
+import { fetchSheet, addRow, updateRow, deleteRow, isApiConfigured } from "../lib/apiClient";
+
 export type TestimonialStatus = "Pending" | "Approved" | "Rejected";
 
 export interface Testimonial {
@@ -11,37 +14,32 @@ export interface Testimonial {
   shownCount: number;
 }
 
-const getScriptUrl = (): string | null => {
-  const url = import.meta.env.VITE_GOOGLE_SCRIPT_URL;
-  return url && url.trim() !== "" ? url.trim() : null;
-};
-
-const getSecret = () => import.meta.env.VITE_WEBAPP_SECRET || "";
-
 export const TESTIMONIAL_MAX_LENGTH = 255;
 
 export const testimonialsService = {
   /** Fetches every testimonial regardless of status (used by Admin). */
   async fetchTestimonials(): Promise<Testimonial[]> {
-    const url = getScriptUrl();
-    if (!url) {
-      console.warn("[testimonialsService] VITE_GOOGLE_SCRIPT_URL is not set. Returning an empty list.");
+    if (!isApiConfigured()) {
+      console.warn("[testimonialsService] VITE_API_URL is not set. Returning an empty list.");
       return [];
     }
-    try {
-      const fetchUrl = `${url}${url.includes("?") ? "&" : "?"}secret=${encodeURIComponent(getSecret())}&sheet=testimonials`;
-      const response = await fetch(fetchUrl);
-      const data = await response.json();
-      if (data.error) throw new Error(data.error);
-      return (data as any[]).map(t => ({
-        ...t,
-        stars: Number(t.stars) || 5,
-        shownCount: Number(t.shownCount) || 0,
-      })) as Testimonial[];
-    } catch (error) {
-      console.error("[testimonialsService] Failed to fetch testimonials.", error);
-      return [];
-    }
+    return cachedFetch(
+      "testimonials",
+      async () => {
+        try {
+          const data = await fetchSheet<any>("testimonials");
+          return data.map((t) => ({
+            ...t,
+            stars: Number(t.stars) || 5,
+            shownCount: Number(t.shownCount) || 0,
+          })) as Testimonial[];
+        } catch (error) {
+          console.error("[testimonialsService] Failed to fetch testimonials.", error);
+          return [];
+        }
+      },
+      5000,
+    );
   },
 
   /** All Approved testimonials, unordered — used by Admin/debug views. */
@@ -92,20 +90,13 @@ export const testimonialsService = {
       shownCount: 0,
     };
 
-    const url = getScriptUrl();
-    if (!url) {
-      console.warn("[testimonialsService] VITE_GOOGLE_SCRIPT_URL is not set. Testimonial was not saved.");
+    if (!isApiConfigured()) {
+      console.warn("[testimonialsService] VITE_API_URL is not set. Testimonial was not saved.");
       return newTestimonial;
     }
     try {
-      const secret = getSecret();
-      const fetchUrl = `${url}${url.includes("?") ? "&" : "?"}secret=${encodeURIComponent(secret)}&sheet=testimonials`;
-      await fetch(fetchUrl, {
-        method: "POST",
-        mode: "no-cors",
-        headers: { "Content-Type": "text/plain;charset=utf-8" },
-        body: JSON.stringify({ secret, sheet: "testimonials", action: "add", data: newTestimonial }),
-      });
+      await addRow("testimonials", newTestimonial as unknown as Record<string, unknown>);
+      invalidateCache("testimonials");
     } catch (error) {
       console.error("[testimonialsService] Failed to save testimonial.", error);
     }
@@ -113,34 +104,20 @@ export const testimonialsService = {
   },
 
   async updateTestimonial(id: string, updates: Partial<Testimonial>): Promise<void> {
-    const url = getScriptUrl();
-    if (!url) return;
+    if (!isApiConfigured()) return;
     try {
-      const secret = getSecret();
-      const fetchUrl = `${url}${url.includes("?") ? "&" : "?"}secret=${encodeURIComponent(secret)}&sheet=testimonials`;
-      await fetch(fetchUrl, {
-        method: "POST",
-        mode: "no-cors",
-        headers: { "Content-Type": "text/plain;charset=utf-8" },
-        body: JSON.stringify({ secret, sheet: "testimonials", action: "update", id, data: updates }),
-      });
+      await updateRow("testimonials", id, updates as Record<string, unknown>);
+      invalidateCache("testimonials");
     } catch (error) {
       console.error("[testimonialsService] Failed to update testimonial.", error);
     }
   },
 
   async deleteTestimonial(id: string): Promise<void> {
-    const url = getScriptUrl();
-    if (!url) return;
+    if (!isApiConfigured()) return;
     try {
-      const secret = getSecret();
-      const fetchUrl = `${url}${url.includes("?") ? "&" : "?"}secret=${encodeURIComponent(secret)}&sheet=testimonials`;
-      await fetch(fetchUrl, {
-        method: "POST",
-        mode: "no-cors",
-        headers: { "Content-Type": "text/plain;charset=utf-8" },
-        body: JSON.stringify({ secret, sheet: "testimonials", action: "delete", id }),
-      });
+      await deleteRow("testimonials", id);
+      invalidateCache("testimonials");
     } catch (error) {
       console.error("[testimonialsService] Failed to delete testimonial.", error);
     }

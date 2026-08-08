@@ -1,11 +1,13 @@
 import { parseSheetBoolean } from "../lib/utils";
+import { cachedFetch, invalidateCache } from "../lib/requestCache";
+import { fetchSheet, addRow, updateRow, deleteRow, isApiConfigured } from "../lib/apiClient";
 
 export interface Workshop {
   id: string;
-  title: string;
   /** Strict ISO "YYYY-MM-DD" for new entries (set via a date picker in Admin). Older records may still hold a free-form label like "Jun 28" — see formatFlexibleDate in lib/dateFormat.ts for display. */
   date: string;
-  /** Comma-separated tag list under the hood (e.g. "Free,Beginner") so the existing "tag" sheet column doesn't need a schema change. Use parseTagsString/stringifyTags to work with it as string[]. */
+  title: string;
+  /** Comma-separated tag list under the hood (e.g. "Free,Beginner") so the existing "tag" field doesn't need a schema change. Use parseTagsString/stringifyTags to work with it as string[]. */
   tag: string;
   image: string;
   link?: string; // external booking link (e.g. Luma)
@@ -14,13 +16,6 @@ export interface Workshop {
   /** Whether this workshop should appear on the client landing page. Admin-curated — see CLIENT_PAGE_LIMIT in pages/admin/Workshops.tsx. Missing/blank cells (rows saved before this field existed) default to visible so nothing disappears unexpectedly. */
   visible?: boolean;
 }
-
-const getScriptUrl = (): string | null => {
-  const url = import.meta.env.VITE_GOOGLE_SCRIPT_URL;
-  return url && url.trim() !== "" ? url.trim() : null;
-};
-
-const getSecret = () => import.meta.env.VITE_WEBAPP_SECRET || "";
 
 /**
  * Splits a stored tag string into a clean array of individual tags.
@@ -36,30 +31,32 @@ export function parseTagsString(tag: string | undefined | null): string[] {
     .filter(Boolean);
 }
 
-/** Joins a tag array back into the comma-separated string stored in the "tag" sheet column. */
+/** Joins a tag array back into the comma-separated string stored in the "tag" field. */
 export function stringifyTags(tags: string[]): string {
   return tags.map(t => t.trim()).filter(Boolean).join(", ");
 }
 
 export const workshopsService = {
   async fetchWorkshops(): Promise<Workshop[]> {
-    const url = getScriptUrl();
-    if (!url) {
-      console.warn("[workshopsService] VITE_GOOGLE_SCRIPT_URL is not set. Returning an empty list.");
+    if (!isApiConfigured()) {
+      console.warn("[workshopsService] VITE_API_URL is not set. Returning an empty list.");
       return [];
     }
-    try {
-      const fetchUrl = `${url}${url.includes("?") ? "&" : "?"}secret=${encodeURIComponent(getSecret())}&sheet=workshops`;
-      const response = await fetch(fetchUrl);
-      const data = await response.json();
-      if (data.error) throw new Error(data.error);
-      return (data as Workshop[])
-        .map(w => ({ ...w, order: Number(w.order) || 0, visible: parseSheetBoolean(w.visible, true) }))
-        .sort((a, b) => (a.order || 0) - (b.order || 0) || (a.createdAt || "").localeCompare(b.createdAt || ""));
-    } catch (error) {
-      console.error("[workshopsService] Failed to fetch workshops.", error);
-      return [];
-    }
+    return cachedFetch(
+      "workshops",
+      async () => {
+        try {
+          const data = await fetchSheet<any>("workshops");
+          return data
+            .map((w) => ({ ...w, order: Number(w.order) || 0, visible: parseSheetBoolean(w.visible, true) }))
+            .sort((a, b) => (a.order || 0) - (b.order || 0) || (a.createdAt || "").localeCompare(b.createdAt || "")) as Workshop[];
+        } catch (error) {
+          console.error("[workshopsService] Failed to fetch workshops.", error);
+          return [];
+        }
+      },
+      8000,
+    );
   },
 
   async addWorkshop(workshop: { title: string; date: string; tag: string; image: string; link?: string; order?: number; visible?: boolean }): Promise<Workshop> {
@@ -69,20 +66,13 @@ export const workshopsService = {
       ...workshop,
       createdAt: new Date().toISOString(),
     };
-    const url = getScriptUrl();
-    if (!url) {
-      console.warn("[workshopsService] VITE_GOOGLE_SCRIPT_URL is not set. Workshop was not saved.");
+    if (!isApiConfigured()) {
+      console.warn("[workshopsService] VITE_API_URL is not set. Workshop was not saved.");
       return newWorkshop;
     }
     try {
-      const secret = getSecret();
-      const fetchUrl = `${url}${url.includes("?") ? "&" : "?"}secret=${encodeURIComponent(secret)}&sheet=workshops`;
-      await fetch(fetchUrl, {
-        method: "POST",
-        mode: "no-cors",
-        headers: { "Content-Type": "text/plain;charset=utf-8" },
-        body: JSON.stringify({ secret, sheet: "workshops", action: "add", data: newWorkshop }),
-      });
+      await addRow("workshops", newWorkshop as unknown as Record<string, unknown>);
+      invalidateCache("workshops");
     } catch (error) {
       console.error("[workshopsService] Failed to save workshop.", error);
     }
@@ -90,34 +80,20 @@ export const workshopsService = {
   },
 
   async updateWorkshop(id: string, updates: Partial<Workshop>): Promise<void> {
-    const url = getScriptUrl();
-    if (!url) return;
+    if (!isApiConfigured()) return;
     try {
-      const secret = getSecret();
-      const fetchUrl = `${url}${url.includes("?") ? "&" : "?"}secret=${encodeURIComponent(secret)}&sheet=workshops`;
-      await fetch(fetchUrl, {
-        method: "POST",
-        mode: "no-cors",
-        headers: { "Content-Type": "text/plain;charset=utf-8" },
-        body: JSON.stringify({ secret, sheet: "workshops", action: "update", id, data: updates }),
-      });
+      await updateRow("workshops", id, updates as Record<string, unknown>);
+      invalidateCache("workshops");
     } catch (error) {
       console.error("[workshopsService] Failed to update workshop.", error);
     }
   },
 
   async deleteWorkshop(id: string): Promise<void> {
-    const url = getScriptUrl();
-    if (!url) return;
+    if (!isApiConfigured()) return;
     try {
-      const secret = getSecret();
-      const fetchUrl = `${url}${url.includes("?") ? "&" : "?"}secret=${encodeURIComponent(secret)}&sheet=workshops`;
-      await fetch(fetchUrl, {
-        method: "POST",
-        mode: "no-cors",
-        headers: { "Content-Type": "text/plain;charset=utf-8" },
-        body: JSON.stringify({ secret, sheet: "workshops", action: "delete", id }),
-      });
+      await deleteRow("workshops", id);
+      invalidateCache("workshops");
     } catch (error) {
       console.error("[workshopsService] Failed to delete workshop.", error);
     }

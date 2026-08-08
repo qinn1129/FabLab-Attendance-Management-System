@@ -1,4 +1,6 @@
 import { parseSheetBoolean } from "../lib/utils";
+import { cachedFetch, invalidateCache } from "../lib/requestCache";
+import { fetchSheet, addRow, updateRow, deleteRow, isApiConfigured } from "../lib/apiClient";
 
 export interface ServiceOffering {
   id: string;
@@ -11,32 +13,27 @@ export interface ServiceOffering {
   visible?: boolean;
 }
 
-const getScriptUrl = (): string | null => {
-  const url = import.meta.env.VITE_GOOGLE_SCRIPT_URL;
-  return url && url.trim() !== "" ? url.trim() : null;
-};
-
-const getSecret = () => import.meta.env.VITE_WEBAPP_SECRET || "";
-
 export const servicesService = {
   async fetchServices(): Promise<ServiceOffering[]> {
-    const url = getScriptUrl();
-    if (!url) {
-      console.warn("[servicesService] VITE_GOOGLE_SCRIPT_URL is not set. Returning an empty list.");
+    if (!isApiConfigured()) {
+      console.warn("[servicesService] VITE_API_URL is not set. Returning an empty list.");
       return [];
     }
-    try {
-      const fetchUrl = `${url}${url.includes("?") ? "&" : "?"}secret=${encodeURIComponent(getSecret())}&sheet=services`;
-      const response = await fetch(fetchUrl);
-      const data = await response.json();
-      if (data.error) throw new Error(data.error);
-      return (data as ServiceOffering[])
-        .map(s => ({ ...s, order: Number(s.order) || 0, visible: parseSheetBoolean(s.visible, true) }))
-        .sort((a, b) => (a.order || 0) - (b.order || 0) || (a.createdAt || "").localeCompare(b.createdAt || ""));
-    } catch (error) {
-      console.error("[servicesService] Failed to fetch services.", error);
-      return [];
-    }
+    return cachedFetch(
+      "services",
+      async () => {
+        try {
+          const data = await fetchSheet<any>("services");
+          return data
+            .map((s) => ({ ...s, order: Number(s.order) || 0, visible: parseSheetBoolean(s.visible, true) }))
+            .sort((a, b) => (a.order || 0) - (b.order || 0) || (a.createdAt || "").localeCompare(b.createdAt || "")) as ServiceOffering[];
+        } catch (error) {
+          console.error("[servicesService] Failed to fetch services.", error);
+          return [];
+        }
+      },
+      8000,
+    );
   },
 
   async addService(service: { title: string; desc: string; icon: string; image?: string; order?: number; visible?: boolean }): Promise<ServiceOffering> {
@@ -46,20 +43,13 @@ export const servicesService = {
       ...service,
       createdAt: new Date().toISOString(),
     };
-    const url = getScriptUrl();
-    if (!url) {
-      console.warn("[servicesService] VITE_GOOGLE_SCRIPT_URL is not set. Service was not saved.");
+    if (!isApiConfigured()) {
+      console.warn("[servicesService] VITE_API_URL is not set. Service was not saved.");
       return newService;
     }
     try {
-      const secret = getSecret();
-      const fetchUrl = `${url}${url.includes("?") ? "&" : "?"}secret=${encodeURIComponent(secret)}&sheet=services`;
-      await fetch(fetchUrl, {
-        method: "POST",
-        mode: "no-cors",
-        headers: { "Content-Type": "text/plain;charset=utf-8" },
-        body: JSON.stringify({ secret, sheet: "services", action: "add", data: newService }),
-      });
+      await addRow("services", newService as unknown as Record<string, unknown>);
+      invalidateCache("services");
     } catch (error) {
       console.error("[servicesService] Failed to save service.", error);
     }
@@ -67,34 +57,20 @@ export const servicesService = {
   },
 
   async updateService(id: string, updates: Partial<ServiceOffering>): Promise<void> {
-    const url = getScriptUrl();
-    if (!url) return;
+    if (!isApiConfigured()) return;
     try {
-      const secret = getSecret();
-      const fetchUrl = `${url}${url.includes("?") ? "&" : "?"}secret=${encodeURIComponent(secret)}&sheet=services`;
-      await fetch(fetchUrl, {
-        method: "POST",
-        mode: "no-cors",
-        headers: { "Content-Type": "text/plain;charset=utf-8" },
-        body: JSON.stringify({ secret, sheet: "services", action: "update", id, data: updates }),
-      });
+      await updateRow("services", id, updates as Record<string, unknown>);
+      invalidateCache("services");
     } catch (error) {
       console.error("[servicesService] Failed to update service.", error);
     }
   },
 
   async deleteService(id: string): Promise<void> {
-    const url = getScriptUrl();
-    if (!url) return;
+    if (!isApiConfigured()) return;
     try {
-      const secret = getSecret();
-      const fetchUrl = `${url}${url.includes("?") ? "&" : "?"}secret=${encodeURIComponent(secret)}&sheet=services`;
-      await fetch(fetchUrl, {
-        method: "POST",
-        mode: "no-cors",
-        headers: { "Content-Type": "text/plain;charset=utf-8" },
-        body: JSON.stringify({ secret, sheet: "services", action: "delete", id }),
-      });
+      await deleteRow("services", id);
+      invalidateCache("services");
     } catch (error) {
       console.error("[servicesService] Failed to delete service.", error);
     }

@@ -49,3 +49,7 @@ credentials.json
 *.pyc
 *.pyo
 
+# mongo-service migration artifacts — accounts_export.csv contains real
+# password hashes and salts and must NEVER be committed.
+mongo-service/accounts_export.csv
+mongo-service/*.csv

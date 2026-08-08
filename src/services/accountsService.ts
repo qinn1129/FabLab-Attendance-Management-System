@@ -1,3 +1,6 @@
+import { cachedFetch, invalidateCache } from "../lib/requestCache";
+import { fetchSheet, updateRow, authAction, isApiConfigured, ApiError } from "../lib/apiClient";
+
 export interface Account {
   id: string;
   role: "Admin" | "ResidentMaker";
@@ -17,47 +20,17 @@ export interface Account {
   profilePicture?: string;
 }
 
-// const LOCAL_STORAGE_KEY = "fablab_accounts_v1";
-
-const getScriptUrl = (): string | null => {
-  const url = import.meta.env.VITE_GOOGLE_SCRIPT_URL;
-  return url && url.trim() !== "" ? url.trim() : null;
-};
-
-const getSecret = () => import.meta.env.VITE_WEBAPP_SECRET || "";
-
-// Local fallback so the app still runs without a deployed backend.
-// const seedLocalAccounts = (): Account[] => {
-//   const existing = localStorage.getItem(LOCAL_STORAGE_KEY);
-//   if (existing) {
-//     try {
-//       return JSON.parse(existing);
-//     } catch (e) {
-//       console.error("Error parsing local accounts", e);
-//     }
-//   }
-//   const seeded: Account[] = [
-//     { id: "ACC-local-admin", role: "Admin", firstName: "Domie James", lastName: "Jucutan", email: "admin@animolabs.ph", status: "Active" },
-//   ];
-//   localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(seeded));
-//   return seeded;
-// };
-
 export const accountsService = {
   /**
-   * Attempts login against the Apps Script "login" action.
-   * Falls back to a no-op local check ONLY when no script URL is
-   * configured, so local dev still works.
+   * Attempts login against the API's "login" action.
    */
   async login(
     email: string,
     password: string,
   ): Promise<{ success: boolean; user?: Account; error?: string }> {
-    const url = getScriptUrl();
-
-    if (!url) {
+    if (!isApiConfigured()) {
       console.warn(
-        "[accountsService] VITE_GOOGLE_SCRIPT_URL is not set. " +
+        "[accountsService] VITE_API_URL is not set. " +
           "Login cannot be verified without the backend — check your .env " +
           "file and restart the Vite dev server (env changes require a restart).",
       );
@@ -69,26 +42,14 @@ export const accountsService = {
     }
 
     try {
-      const response = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "text/plain" }, // avoids CORS preflight, per existing pattern
-        body: JSON.stringify({
-          secret: getSecret(),
-          action: "login",
-          email: email.trim(),
-          password,
-        }),
-      });
-      const data = await response.json();
-      if (data.error) return { success: false, error: data.error };
-      if (!data.user)
-        return { success: false, error: "Unexpected response from server." };
+      const data = await authAction("login", { email: email.trim(), password });
+      if (!data.user) return { success: false, error: "Unexpected response from server." };
       return { success: true, user: data.user as Account };
     } catch (error) {
       console.error("[accountsService] Login request failed.", error);
       return {
         success: false,
-        error: "Unable to reach the server. Please try again.",
+        error: error instanceof ApiError ? error.message : "Unable to reach the server. Please try again.",
       };
     }
   },
@@ -105,12 +66,8 @@ export const accountsService = {
     program?: string;
     year?: string;
   }): Promise<{ success: boolean; message?: string; error?: string }> {
-    const url = getScriptUrl();
-
-    if (!url) {
-      console.warn(
-        "[accountsService] VITE_GOOGLE_SCRIPT_URL is not set. Registration cannot be saved.",
-      );
+    if (!isApiConfigured()) {
+      console.warn("[accountsService] VITE_API_URL is not set. Registration cannot be saved.");
       return {
         success: false,
         error:
@@ -119,47 +76,42 @@ export const accountsService = {
     }
 
     try {
-      const response = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "text/plain" },
-        body: JSON.stringify({
-          secret: getSecret(),
-          action: "registerRM",
-          ...payload,
-        }),
-      });
-      const data = await response.json();
-      if (data.error) return { success: false, error: data.error };
+      const data = await authAction("registerRM", payload);
+      invalidateCache("accounts");
       return { success: true, message: data.message };
     } catch (error) {
       console.error("[accountsService] Registration request failed.", error);
       return {
         success: false,
-        error: "Unable to reach the server. Please try again.",
+        error: error instanceof ApiError ? error.message : "Unable to reach the server. Please try again.",
       };
     }
   },
 
-  /** Fetches all accounts (passwordHash/salt are stripped server-side). */
+  /**
+   * Fetches all accounts (passwordHash/salt are stripped server-side).
+   * Cached for a few seconds so multiple components mounting around the
+   * same time (e.g. RM Accounts + Schedules + Requests tabs all loading
+   * together) share one network call instead of each firing their own.
+   */
   async fetchAccounts(): Promise<Account[]> {
-    const url = getScriptUrl();
-    if (!url) {
-      console.warn(
-        "[accountsService] VITE_GOOGLE_SCRIPT_URL is not set. Returning an empty account list.",
-      );
+    if (!isApiConfigured()) {
+      console.warn("[accountsService] VITE_API_URL is not set. Returning an empty account list.");
       return [];
     }
 
-    try {
-      const fetchUrl = `${url}${url.includes("?") ? "&" : "?"}secret=${encodeURIComponent(getSecret())}&sheet=accounts`;
-      const response = await fetch(fetchUrl);
-      const data = await response.json();
-      if (data.error) throw new Error(data.error);
-      return data as Account[];
-    } catch (error) {
-      console.error("[accountsService] Failed to fetch accounts.", error);
-      return [];
-    }
+    return cachedFetch(
+      "accounts",
+      async () => {
+        try {
+          return await fetchSheet<Account>("accounts");
+        } catch (error) {
+          console.error("[accountsService] Failed to fetch accounts.", error);
+          return [];
+        }
+      },
+      5000,
+    );
   },
 
   /**
@@ -177,11 +129,8 @@ export const accountsService = {
     id: string,
     updates: Partial<Account>,
   ): Promise<{ success: boolean; error?: string }> {
-    const url = getScriptUrl();
-    if (!url) {
-      console.warn(
-        "[accountsService] VITE_GOOGLE_SCRIPT_URL is not set. Update cannot be saved.",
-      );
+    if (!isApiConfigured()) {
+      console.warn("[accountsService] VITE_API_URL is not set. Update cannot be saved.");
       return {
         success: false,
         error:
@@ -190,24 +139,14 @@ export const accountsService = {
     }
 
     try {
-      const response = await fetch(`${url}?sheet=accounts`, {
-        method: "POST",
-        headers: { "Content-Type": "text/plain" },
-        body: JSON.stringify({
-          secret: getSecret(),
-          action: "update",
-          id,
-          data: updates,
-        }),
-      });
-      const data = await response.json();
-      if (data.error) return { success: false, error: data.error };
+      await updateRow("accounts", id, updates as Record<string, unknown>);
+      invalidateCache("accounts");
       return { success: true };
     } catch (error) {
       console.error("[accountsService] Failed to update account.", error);
       return {
         success: false,
-        error: "Unable to reach the server. Please try again.",
+        error: error instanceof ApiError ? error.message : "Unable to reach the server. Please try again.",
       };
     }
   },
@@ -228,32 +167,19 @@ export const accountsService = {
     currentPassword: string,
     newPassword: string,
   ): Promise<{ success: boolean; error?: string }> {
-    const url = getScriptUrl();
-    if (!url) {
+    if (!isApiConfigured()) {
       // No backend configured — nothing real to verify against locally.
       return { success: true };
     }
 
     try {
-      const response = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "text/plain" },
-        body: JSON.stringify({
-          secret: getSecret(),
-          action: "changePassword",
-          id,
-          currentPassword,
-          newPassword,
-        }),
-      });
-      const data = await response.json();
-      if (data.error) return { success: false, error: data.error };
+      await authAction("changePassword", { id, currentPassword, newPassword });
       return { success: true };
     } catch (error) {
       console.error("[accountsService] Change password request failed.", error);
       return {
         success: false,
-        error: "Unable to reach the server. Please try again.",
+        error: error instanceof ApiError ? error.message : "Unable to reach the server. Please try again.",
       };
     }
   },

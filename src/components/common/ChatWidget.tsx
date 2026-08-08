@@ -56,8 +56,19 @@ function escapeRegExp(s: string): string {
  * autocomplete against all active Admin and Resident Maker accounts, plus a
  * special "@everyone" broadcast mention. Plays a distinct notification chime
  * for personal mentions vs. @everyone broadcasts, and shows an unread badge
- * on the floating bubble while the widget is closed. Polls continuously
- * (open or closed) so notifications still fire when the widget is minimized.
+ * on the floating bubble while the widget is closed.
+ *
+ * Polling only runs while the widget is OPEN. This is a deliberate tradeoff:
+ * previously it polled continuously (open or closed) so mention/@everyone
+ * sounds and the unread badge would fire even while minimized — but that
+ * meant a request to the Sheets-backed chat endpoint every 4 seconds for
+ * the entire time the app was open, which was the single largest
+ * contributor to the app feeling slow overall. Now, closed-widget
+ * notifications (badge count, mention/everyone chimes while minimized) no
+ * longer fire — you'll only see new messages once you open the panel. If
+ * that tradeoff turns out to matter more than the performance win, the
+ * previous "poll continuously" behavior is preserved in git history and
+ * can be restored by reverting this file.
  * @param {ChatWidgetProps} props
  * @returns {JSX.Element}
  */
@@ -262,11 +273,16 @@ export function ChatWidget({ accentColor = "emerald", senderName, senderRole }: 
     if (open) loadMentionableUsers();
   }, [open, loadMentionableUsers]);
 
-  // Poll continuously for the entire lifetime of the widget, regardless of
-  // open/closed state, so mention/everyone notification sounds and the
-  // unread badge still work while the panel is minimized.
+  // Poll only while the widget is open. This trades away background
+  // mention/@everyone notifications and the unread badge while minimized,
+  // in exchange for not hitting the Sheets-backed chat endpoint every 4s
+  // for the entire time the app is open, which was the single biggest
+  // contributor to perceived app-wide slowness. Also refreshes immediately
+  // and clears the unread badge the moment the widget is opened.
   useEffect(() => {
+    if (!open) return;
     loadMessages();
+    setUnreadCount(0);
     pollRef.current = setInterval(loadMessages, POLL_INTERVAL_MS);
     return () => {
       if (pollRef.current) {
@@ -274,14 +290,6 @@ export function ChatWidget({ accentColor = "emerald", senderName, senderRole }: 
         pollRef.current = null;
       }
     };
-  }, [loadMessages]);
-
-  // Refresh immediately and clear the unread badge whenever the widget is opened.
-  useEffect(() => {
-    if (open) {
-      loadMessages();
-      setUnreadCount(0);
-    }
   }, [open, loadMessages]);
 
   useEffect(() => {

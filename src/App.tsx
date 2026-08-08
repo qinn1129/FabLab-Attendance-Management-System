@@ -5,11 +5,12 @@ import { AdminPortal } from "./pages/admin/AdminPortal";
 import { MakerPortal } from "./pages/maker/MakerPortal";
 import { sheetsService, type Commission } from "./services/sheetsService";
 import { DialogProvider } from "./components/common";
+import { invalidateCache } from "./lib/requestCache";
 
 /**
  * Main application entry point that handles top-level routing between the 
  * Landing Page, Client Portal, Admin Portal, and Resident Maker Portal.
- * Integrates Google Sheets synchronization for reservations.
+ * Integrates backend synchronization for commissions.
  * @returns {JSX.Element}
  */
 export default function App() {
@@ -20,6 +21,13 @@ export default function App() {
   const fetchCommissionsData = async () => {
     setLoading(true);
     try {
+      // Explicitly invalidate the cache first — this function backs the
+      // "Refresh" buttons in Approvals/Tracker (via onRefresh below) as
+      // well as the initial page load, so it must always get fresh data
+      // rather than silently serving whatever's still in the short-lived
+      // request cache. On initial mount the cache is empty anyway, so this
+      // is a no-op there.
+      invalidateCache("commissions");
       const data = await sheetsService.fetchCommissions();
       setCommissions(data);
     } catch (e) {

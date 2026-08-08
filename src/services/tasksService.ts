@@ -1,5 +1,7 @@
 import { type Account } from "./accountsService";
 import { type Commission } from "./sheetsService";
+import { cachedFetch, invalidateCache } from "../lib/requestCache";
+import { fetchSheet, addRow, updateRow, deleteRow, isApiConfigured } from "../lib/apiClient";
 
 export type RMTaskStatus = "Pending" | "In Progress" | "Completed";
 export type RMTaskSource = "Manual" | "Auto";
@@ -14,43 +16,36 @@ export interface RMTask {
   createdAt: string;
 }
 
-const getScriptUrl = (): string | null => {
-  const url = import.meta.env.VITE_GOOGLE_SCRIPT_URL;
-  return url && url.trim() !== "" ? url.trim() : null;
-};
-
-const getSecret = () => import.meta.env.VITE_WEBAPP_SECRET || "";
-
 /**
- * This service now backs ONLY standalone, non-commission work items (lab
+ * This service backs ONLY standalone, non-commission work items (lab
  * upkeep, training, one-off errands — see Admin > Manual Tasks). Commission
- * assignment/workload is tracked in the "commission_reqs" sheet itself
- * (via Commission.rm / Commission.status), not mirrored here — a prior
- * version of this app logged a task-sheet row every time a commission was
- * approved/assigned, purely to power the "least busy RM" auto-assign pick,
- * but nothing ever updated or cleared those rows when a commission was
- * later reassigned or completed in the Tracker, so the workload count
- * could drift arbitrarily far from reality over time. See
- * pickLeastBusyMakerIdFromCommissions below for the fix — it counts
- * directly from live commission data instead.
+ * assignment/workload is tracked in the "commission_reqs" collection itself
+ * (via Commission.rm / Commission.status), not mirrored here — see
+ * pickLeastBusyMakerIdFromCommissions below, which counts directly from
+ * live commission data instead of a separate task log that could drift out
+ * of sync.
  */
 export const tasksService = {
   async fetchTasks(): Promise<RMTask[]> {
-    const url = getScriptUrl();
-    if (!url) {
-      console.warn("[tasksService] VITE_GOOGLE_SCRIPT_URL is not set. Returning an empty list.");
+    if (!isApiConfigured()) {
+      console.warn("[tasksService] VITE_API_URL is not set. Returning an empty list.");
       return [];
     }
-    try {
-      const fetchUrl = `${url}${url.includes("?") ? "&" : "?"}secret=${encodeURIComponent(getSecret())}&sheet=tasks`;
-      const response = await fetch(fetchUrl);
-      const data = await response.json();
-      if (data.error) throw new Error(data.error);
-      return (data as RMTask[]).sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
-    } catch (error) {
-      console.error("[tasksService] Failed to fetch tasks.", error);
-      return [];
-    }
+    return cachedFetch(
+      "tasks",
+      async () => {
+        try {
+          const data = await fetchSheet<RMTask>("tasks");
+          return data.sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
+        } catch (error) {
+          console.error("[tasksService] Failed to fetch tasks.", error);
+          return [];
+        }
+      },
+      // Kept short since the RM sidebar badge and Admin's "active
+      // commissions" pill both rely on this staying reasonably fresh.
+      3000,
+    );
   },
 
   async addTask(task: { rm_id: string; task: string; deadline: string; source: RMTaskSource }): Promise<RMTask> {
@@ -60,20 +55,13 @@ export const tasksService = {
       status: "Pending",
       createdAt: new Date().toISOString(),
     };
-    const url = getScriptUrl();
-    if (!url) {
-      console.warn("[tasksService] VITE_GOOGLE_SCRIPT_URL is not set. Task was not saved.");
+    if (!isApiConfigured()) {
+      console.warn("[tasksService] VITE_API_URL is not set. Task was not saved.");
       return newTask;
     }
     try {
-      const secret = getSecret();
-      const fetchUrl = `${url}${url.includes("?") ? "&" : "?"}secret=${encodeURIComponent(secret)}&sheet=tasks`;
-      await fetch(fetchUrl, {
-        method: "POST",
-        mode: "no-cors",
-        headers: { "Content-Type": "text/plain;charset=utf-8" },
-        body: JSON.stringify({ secret, sheet: "tasks", action: "add", data: newTask }),
-      });
+      await addRow("tasks", newTask as unknown as Record<string, unknown>);
+      invalidateCache("tasks");
     } catch (error) {
       console.error("[tasksService] Failed to save task.", error);
     }
@@ -81,34 +69,20 @@ export const tasksService = {
   },
 
   async updateTask(id: string, updates: Partial<RMTask>): Promise<void> {
-    const url = getScriptUrl();
-    if (!url) return;
+    if (!isApiConfigured()) return;
     try {
-      const secret = getSecret();
-      const fetchUrl = `${url}${url.includes("?") ? "&" : "?"}secret=${encodeURIComponent(secret)}&sheet=tasks`;
-      await fetch(fetchUrl, {
-        method: "POST",
-        mode: "no-cors",
-        headers: { "Content-Type": "text/plain;charset=utf-8" },
-        body: JSON.stringify({ secret, sheet: "tasks", action: "update", id, data: updates }),
-      });
+      await updateRow("tasks", id, updates as Record<string, unknown>);
+      invalidateCache("tasks");
     } catch (error) {
       console.error("[tasksService] Failed to update task.", error);
     }
   },
 
   async deleteTask(id: string): Promise<void> {
-    const url = getScriptUrl();
-    if (!url) return;
+    if (!isApiConfigured()) return;
     try {
-      const secret = getSecret();
-      const fetchUrl = `${url}${url.includes("?") ? "&" : "?"}secret=${encodeURIComponent(secret)}&sheet=tasks`;
-      await fetch(fetchUrl, {
-        method: "POST",
-        mode: "no-cors",
-        headers: { "Content-Type": "text/plain;charset=utf-8" },
-        body: JSON.stringify({ secret, sheet: "tasks", action: "delete", id }),
-      });
+      await deleteRow("tasks", id);
+      invalidateCache("tasks");
     } catch (error) {
       console.error("[tasksService] Failed to delete task.", error);
     }
@@ -121,11 +95,7 @@ export const tasksService = {
  * assigned name), then returns whichever RM has the fewest. Ties are broken
  * by whoever appears first in `activeMakers` (stable, no randomness).
  *
- * Replaces the old tasks-sheet-based counter, which could drift from
- * reality once a commission was reassigned or completed in the Tracker
- * (nothing updated the corresponding task-log row when that happened).
- * This always reflects the Tracker's current state, since it reads the
- * same `commissions` data the Tracker itself displays.
+ * Pure function — no network calls, unaffected by the Mongo migration.
  */
 import { isCommissionAssignedToMaker } from "../lib/commissionUtils";
 
